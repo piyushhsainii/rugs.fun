@@ -11,12 +11,10 @@ export default function Home() {
   );
   const [history, setHistory] = useState<number[]>([]);
 
-  const CHUNK_SIZE = 3;
   const CANDLE_WIDTH = 30;
   const LEFT_PADDING = 60;
   const MAX_VISIBLE_CANDLES = 20;
 
-  // Animation refs
   const animatedMultiplierRef = useRef<number>(1.0);
   const targetMultiplierRef = useRef<number>(1.0);
   const historyRef = useRef<number[]>([]);
@@ -85,7 +83,7 @@ export default function Home() {
     const data = historyRef.current;
     if (!data.length) return;
 
-    // Dynamic Y-axis with padding
+    // Dynamic Y-axis
     const rawMax = Math.max(...data, current);
     const rawMin = Math.min(...data, current);
     const padding = (rawMax - rawMin) * 0.1 || 0.1;
@@ -113,26 +111,16 @@ export default function Home() {
       ctx.fillText(value.toFixed(2) + "x", LEFT_PADDING - 10, y);
     }
 
-    // Draw candles
-    const totalChunks = Math.ceil(data.length / CHUNK_SIZE);
-    const startIndex =
-      totalChunks > MAX_VISIBLE_CANDLES ? totalChunks - MAX_VISIBLE_CANDLES : 0;
+    // Draw candles based on delta
+    const visibleData = data.slice(-MAX_VISIBLE_CANDLES);
+    let lastValue = visibleData[0]; // starting point for first candle
 
-    let lastFullClose = 1;
-    let lastFullHigh = 1;
-    let lastFullLow = 1;
-
-    for (let i = startIndex; i < totalChunks; i++) {
-      const startIdx = i * CHUNK_SIZE;
-      const chunk = data.slice(startIdx, startIdx + CHUNK_SIZE);
-      if (!chunk.length) continue;
-
-      const open = chunk[0];
-      const close = chunk[chunk.length - 1];
-      const high = Math.max(...chunk);
-      const low = Math.min(...chunk);
-
-      const x = LEFT_PADDING + (i - startIndex) * CANDLE_WIDTH;
+    visibleData.forEach((val, idx) => {
+      const open = lastValue;
+      const close = val;
+      const high = Math.max(open, close);
+      const low = Math.min(open, close);
+      const x = LEFT_PADDING + idx * CANDLE_WIDTH;
 
       const yOpen = scaleY(open);
       const yClose = scaleY(close);
@@ -157,43 +145,36 @@ export default function Home() {
         Math.max(Math.abs(yClose - yOpen), 2)
       );
 
-      lastFullClose = close;
-      lastFullHigh = high;
-      lastFullLow = low;
-    }
+      lastValue = val;
+    });
 
-    // Forming candle
-    if (data.length) {
-      const formingOpen = lastFullClose;
-      const formingClose = current;
-      const formingHigh = Math.max(lastFullHigh, current);
-      const formingLow = Math.min(lastFullLow, current);
+    // Forming candle (smooth from last point)
+    const formingOpen = lastValue;
+    const formingClose = current;
+    const formingHigh = Math.max(formingOpen, formingClose);
+    const formingLow = Math.min(formingOpen, formingClose);
+    const x = LEFT_PADDING + visibleData.length * CANDLE_WIDTH; // next candle
 
-      const x = LEFT_PADDING + (totalChunks - startIndex) * CANDLE_WIDTH; // next candle position
+    const yOpen = scaleY(formingOpen);
+    const yClose = scaleY(formingClose);
+    const yHigh = scaleY(formingHigh);
+    const yLow = scaleY(formingLow);
+    const color = formingClose >= formingOpen ? "#22c55e" : "#ef4444";
 
-      const yOpen = scaleY(formingOpen);
-      const yClose = scaleY(formingClose);
-      const yHigh = scaleY(formingHigh);
-      const yLow = scaleY(formingLow);
-      const color = formingClose >= formingOpen ? "#22c55e" : "#ef4444";
+    ctx.beginPath();
+    ctx.moveTo(x + CANDLE_WIDTH / 2, yHigh);
+    ctx.lineTo(x + CANDLE_WIDTH / 2, yLow);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-      // Wick
-      ctx.beginPath();
-      ctx.moveTo(x + CANDLE_WIDTH / 2, yHigh);
-      ctx.lineTo(x + CANDLE_WIDTH / 2, yLow);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Body
-      ctx.fillStyle = color;
-      ctx.fillRect(
-        x,
-        Math.min(yOpen, yClose),
-        CANDLE_WIDTH - 2,
-        Math.max(Math.abs(yClose - yOpen), 2)
-      );
-    }
+    ctx.fillStyle = color;
+    ctx.fillRect(
+      x,
+      Math.min(yOpen, yClose),
+      CANDLE_WIDTH - 2,
+      Math.max(Math.abs(yClose - yOpen), 2)
+    );
 
     // Dotted line for current multiplier
     const yCurrent = scaleY(current);
