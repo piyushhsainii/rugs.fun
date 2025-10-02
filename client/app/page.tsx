@@ -11,60 +11,60 @@ export default function Home() {
   );
   const [history, setHistory] = useState<number[]>([]);
 
-  // Connect WS
-  const connectWebSocket = () => {
+  const CHUNK_SIZE = 3;
+  const CANDLE_WIDTH = 30;
+  const LEFT_PADDING = 60;
+  const MAX_VISIBLE_CANDLES = 20;
+
+  // Animation refs
+  const animatedMultiplierRef = useRef<number>(1.0);
+  const targetMultiplierRef = useRef<number>(1.0);
+  const historyRef = useRef<number[]>([]);
+
+  const connectWS = () => {
     const ws = new WebSocket("ws://localhost:8080");
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("Connected to WebSocket server");
+      console.log("Connected to WS");
       setGameState("ACTIVE");
-      setHistory([]);
     };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      setCurrentMultiplier(data.multiplier);
-      setGameState("ACTIVE");
+      const val = data.multiplier;
+
+      targetMultiplierRef.current = val;
+      setCurrentMultiplier(val);
 
       setHistory((prev) => {
-        const newHistory = [...prev, data.multiplier].slice(-200);
-        drawChart(newHistory);
-        return newHistory;
+        const newHist = [...prev, val].slice(-500);
+        historyRef.current = newHist;
+        return newHist;
       });
     };
 
-    ws.onclose = () => {
-      console.log("WebSocket closed");
-      setGameState("CRASHED");
-    };
+    ws.onclose = () => setGameState("CRASHED");
+    ws.onerror = (err) => console.error(err);
   };
 
-  // Restart game handler
-  const restartGame = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-    setGameState("WAITING");
-    setHistory([]);
-    setCurrentMultiplier(1.0);
-
-    // reconnect after short delay
-    setTimeout(() => {
-      connectWebSocket();
-    }, 500);
-  };
-
-  // Initial connect
   useEffect(() => {
-    connectWebSocket();
-    return () => {
-      if (wsRef.current) wsRef.current.close();
-    };
+    connectWS();
+    return () => wsRef.current?.close();
   }, []);
 
-  // Draw candlestick chart
-  const drawChart = (data: number[]) => {
+  const restartGame = () => {
+    wsRef.current?.close();
+    setHistory([]);
+    historyRef.current = [];
+    setCurrentMultiplier(1.0);
+    animatedMultiplierRef.current = 1.0;
+    targetMultiplierRef.current = 1.0;
+    setGameState("WAITING");
+    setTimeout(connectWS, 500);
+  };
+
+  const drawChart = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -73,90 +73,158 @@ export default function Home() {
     const width = canvas.width;
     const height = canvas.height;
 
-    ctx.clearRect(0, 0, width, height);
+    // Smooth animation of current multiplier
+    animatedMultiplierRef.current +=
+      (targetMultiplierRef.current - animatedMultiplierRef.current) * 0.08;
+    const current = animatedMultiplierRef.current;
 
-    // Background
+    ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "#1a1d29";
     ctx.fillRect(0, 0, width, height);
 
-    // Determine scale
-    const maxMultiplier = Math.max(...data, 2);
-    const minMultiplier = Math.min(...data, 0);
-    const paddingLeft = 60;
-    const chartWidth = width - paddingLeft;
+    const data = historyRef.current;
+    if (!data.length) return;
 
-    // Y axis
+    // Dynamic Y-axis with padding
+    const rawMax = Math.max(...data, current);
+    const rawMin = Math.min(...data, current);
+    const padding = (rawMax - rawMin) * 0.1 || 0.1;
+    const maxMultiplier = rawMax + padding;
+    const minMultiplier = rawMin - padding;
+
+    const chartWidth = width - LEFT_PADDING;
+    const scaleY = (val: number) =>
+      height -
+      ((val - minMultiplier) / (maxMultiplier - minMultiplier)) * height;
+
+    // Grid + Y labels
     ctx.strokeStyle = "#2a2d3a";
     ctx.fillStyle = "#9ca3af";
     ctx.font = "14px Inter";
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-
-    const gridLines = 5;
-    for (let i = 0; i <= gridLines; i++) {
-      const y = (height / gridLines) * i;
-      const value =
-        maxMultiplier - (i / gridLines) * (maxMultiplier - minMultiplier);
-
+    for (let i = 0; i <= 5; i++) {
+      const y = (height / 5) * i;
+      const value = maxMultiplier - (i / 5) * (maxMultiplier - minMultiplier);
       ctx.beginPath();
-      ctx.moveTo(paddingLeft, y);
+      ctx.moveTo(LEFT_PADDING, y);
       ctx.lineTo(width, y);
       ctx.stroke();
-
-      ctx.fillText(value.toFixed(2) + "x", paddingLeft - 10, y);
+      ctx.fillText(value.toFixed(2) + "x", LEFT_PADDING - 10, y);
     }
 
-    if (data.length < 2) return;
+    // Draw candles
+    const totalChunks = Math.ceil(data.length / CHUNK_SIZE);
+    const startIndex =
+      totalChunks > MAX_VISIBLE_CANDLES ? totalChunks - MAX_VISIBLE_CANDLES : 0;
 
-    // Candlestick params
-    const candleWidth = chartWidth / Math.min(data.length, 50); // max 50 candles visible
-    const chunkSize = 3; // 3 multipliers = 1 candle
+    let lastFullClose = 1;
+    let lastFullHigh = 1;
+    let lastFullLow = 1;
 
-    for (let i = 0; i < data.length; i += chunkSize) {
-      const chunk = data.slice(i, i + chunkSize);
-      if (chunk.length < 2) continue;
+    for (let i = startIndex; i < totalChunks; i++) {
+      const startIdx = i * CHUNK_SIZE;
+      const chunk = data.slice(startIdx, startIdx + CHUNK_SIZE);
+      if (!chunk.length) continue;
 
       const open = chunk[0];
       const close = chunk[chunk.length - 1];
       const high = Math.max(...chunk);
       const low = Math.min(...chunk);
 
-      const x = paddingLeft + (i / chunkSize) * candleWidth;
-
-      const scaleY = (val: number) =>
-        height -
-        ((val - minMultiplier) / (maxMultiplier - minMultiplier)) * height;
+      const x = LEFT_PADDING + (i - startIndex) * CANDLE_WIDTH;
 
       const yOpen = scaleY(open);
       const yClose = scaleY(close);
       const yHigh = scaleY(high);
       const yLow = scaleY(low);
-
-      const candleColor = close >= open ? "#22c55e" : "#ef4444";
+      const color = close >= open ? "#22c55e" : "#ef4444";
 
       // Wick
       ctx.beginPath();
-      ctx.moveTo(x + candleWidth / 2, yHigh);
-      ctx.lineTo(x + candleWidth / 2, yLow);
-      ctx.strokeStyle = candleColor;
+      ctx.moveTo(x + CANDLE_WIDTH / 2, yHigh);
+      ctx.lineTo(x + CANDLE_WIDTH / 2, yLow);
+      ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.stroke();
 
       // Body
-      ctx.fillStyle = candleColor;
+      ctx.fillStyle = color;
       ctx.fillRect(
         x,
         Math.min(yOpen, yClose),
-        candleWidth - 2,
-        Math.abs(yClose - yOpen) || 2 // avoid zero-height body
+        CANDLE_WIDTH - 2,
+        Math.max(Math.abs(yClose - yOpen), 2)
+      );
+
+      lastFullClose = close;
+      lastFullHigh = high;
+      lastFullLow = low;
+    }
+
+    // Forming candle
+    if (data.length) {
+      const formingOpen = lastFullClose;
+      const formingClose = current;
+      const formingHigh = Math.max(lastFullHigh, current);
+      const formingLow = Math.min(lastFullLow, current);
+
+      const x = LEFT_PADDING + (totalChunks - startIndex) * CANDLE_WIDTH; // next candle position
+
+      const yOpen = scaleY(formingOpen);
+      const yClose = scaleY(formingClose);
+      const yHigh = scaleY(formingHigh);
+      const yLow = scaleY(formingLow);
+      const color = formingClose >= formingOpen ? "#22c55e" : "#ef4444";
+
+      // Wick
+      ctx.beginPath();
+      ctx.moveTo(x + CANDLE_WIDTH / 2, yHigh);
+      ctx.lineTo(x + CANDLE_WIDTH / 2, yLow);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Body
+      ctx.fillStyle = color;
+      ctx.fillRect(
+        x,
+        Math.min(yOpen, yClose),
+        CANDLE_WIDTH - 2,
+        Math.max(Math.abs(yClose - yOpen), 2)
       );
     }
+
+    // Dotted line for current multiplier
+    const yCurrent = scaleY(current);
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(LEFT_PADDING, yCurrent);
+    ctx.lineTo(width, yCurrent);
+    ctx.strokeStyle = "#fbbf24";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "bold 14px Inter";
+    ctx.textAlign = "left";
+    ctx.fillText(`${current.toFixed(3)}x`, LEFT_PADDING + 6, yCurrent - 8);
   };
+
+  useEffect(() => {
+    let animId: number;
+    const loop = () => {
+      drawChart();
+      animId = requestAnimationFrame(loop);
+    };
+    loop();
+    return () => cancelAnimationFrame(animId);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#1a1d29] flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-6xl">
-        {/* Header */}
         <div className="mb-4 flex justify-between items-center">
           <h1 className="text-white text-2xl font-bold">Rug.fun</h1>
           <div className="text-white">
@@ -164,7 +232,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Chart */}
         <div className="bg-[#0f1118] rounded-lg p-4 relative">
           <canvas
             ref={canvasRef}
@@ -172,37 +239,35 @@ export default function Home() {
             height={600}
             className="w-full h-auto rounded-lg border"
           />
+        </div>
 
-          {/* Overlay */}
-          <div className="absolute top-4 left-4 pointer-events-none">
-            <div
-              className={`text-4xl font-bold ${
-                currentMultiplier >= 1 ? "text-green-500" : "text-red-500"
-              }`}
-            >
-              {currentMultiplier.toFixed(3)}x
-            </div>
-            <div className="text-white text-sm mt-1">
-              {gameState === "ACTIVE" && "Round in Progress..."}
-              {gameState === "CRASHED" && "Crashed!"}
-              {gameState === "WAITING" && "Starting soon..."}
-            </div>
+        <div className="text-center mt-4">
+          <div
+            className={`text-6xl font-bold ${
+              currentMultiplier >= 1 ? "text-green-500" : "text-red-500"
+            }`}
+          >
+            {currentMultiplier.toFixed(3)}x
+          </div>
+          <div className="text-white mt-2">
+            {gameState === "ACTIVE" && "Round in Progress..."}
+            {gameState === "CRASHED" && "Crashed!"}
+            {gameState === "WAITING" && "Starting soon..."}
           </div>
         </div>
 
-        {/* Controls */}
         <div className="mt-4 flex gap-4 justify-center">
+          <button
+            onClick={restartGame}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white px-8 py-4 rounded-lg font-bold text-xl"
+          >
+            Restart Game
+          </button>
           <button className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-lg font-bold text-xl">
             BUY
           </button>
           <button className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-lg font-bold text-xl">
             SELL
-          </button>
-          <button
-            onClick={restartGame}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-bold text-xl"
-          >
-            RESTART GAME
           </button>
         </div>
       </div>
