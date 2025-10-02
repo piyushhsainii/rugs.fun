@@ -1,26 +1,34 @@
-import { generateChaoticPath } from "./lib/price_ticks";
 import WebSocket from "ws";
+import { createTickGenerator } from "./lib/price_ticks";
 
-// Create WebSocket server on port 8080
 const wss = new WebSocket.Server({ port: 8080 });
 
 wss.on("connection", (ws) => {
   console.log("Client connected");
 
-  const path = generateChaoticPath();
-  let index = 0;
+  const nextTick = createTickGenerator();
 
   const interval = setInterval(() => {
-    if (index < path.length) {
-      ws.send(JSON.stringify({ multiplier: path[index] }));
-      index++;
-    } else {
+    if (ws.readyState !== WebSocket.OPEN) {
       clearInterval(interval);
-      ws.close(); // Close connection after path is complete
+      return;
     }
-  }, 1000); // send one multiplier per second
 
-  // Clean up on disconnect
+    const { value, crashed } = nextTick();
+
+    ws.send(
+      JSON.stringify({
+        multiplier: value,
+        state: crashed ? "CRASHED" : "ACTIVE",
+      })
+    );
+
+    if (crashed) {
+      clearInterval(interval);
+      ws.close();
+    }
+  }, 500); // tick every 250ms
+
   ws.on("close", () => {
     console.log("Client disconnected");
     clearInterval(interval);
@@ -33,6 +41,3 @@ wss.on("connection", (ws) => {
 });
 
 console.log("WebSocket server running on ws://localhost:8080");
-
-// Example run
-console.log(generateChaoticPath());

@@ -26,24 +26,36 @@ export default function Home() {
     ws.onopen = () => {
       console.log("Connected to WS");
       setGameState("ACTIVE");
+      setHistory([]); // reset history for new round
     };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       const val = data.multiplier;
+      const state = data.state;
 
+      // Update target multiplier for smooth animation
       targetMultiplierRef.current = val;
-      setCurrentMultiplier(val);
 
       setHistory((prev) => {
         const newHist = [...prev, val].slice(-500);
         historyRef.current = newHist;
         return newHist;
       });
+
+      if (state === "CRASHED") {
+        setGameState("CRASHED");
+        ws.close(); // gracefully end the round
+      } else {
+        setGameState("ACTIVE");
+      }
     };
 
-    ws.onclose = () => setGameState("CRASHED");
-    ws.onerror = (err) => console.error(err);
+    ws.onclose = () => {
+      console.log("WS closed");
+    };
+
+    ws.onerror = (err) => console.error("WS error:", err);
   };
 
   useEffect(() => {
@@ -218,7 +230,7 @@ export default function Home() {
             ref={canvasRef}
             width={1200}
             height={600}
-            className="w-full h-auto rounded-lg border"
+            className="w-full h-auto rounded-lg "
           />
         </div>
 
