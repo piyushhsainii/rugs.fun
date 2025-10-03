@@ -16,6 +16,9 @@ export default function Home() {
   const MAX_VISIBLE_CANDLES = 20;
 
   const animatedMultiplierRef = useRef<number>(1.0);
+  const animatedMinRef = useRef<number>(1.0);
+  const animatedMaxRef = useRef<number>(1.0);
+
   const targetMultiplierRef = useRef<number>(1.0);
   const historyRef = useRef<number[]>([]);
 
@@ -95,19 +98,28 @@ export default function Home() {
     const data = historyRef.current;
     if (!data.length) return;
 
-    // Dynamic Y-axis
+    // --- Dynamic Y-axis with smooth scaling ---
+    const DEFAULT_MIN = 0.2;
+    const DEFAULT_MAX = 2.0;
+
     const rawMax = Math.max(...data, current);
     const rawMin = Math.min(...data, current);
     const padding = (rawMax - rawMin) * 0.1 || 0.1;
-    const maxMultiplier = rawMax + padding;
-    const minMultiplier = rawMin - padding;
 
-    const chartWidth = width - LEFT_PADDING;
+    const targetMin = Math.min(DEFAULT_MIN, rawMin - padding);
+    const targetMax = Math.max(DEFAULT_MAX, rawMax + padding);
+
+    animatedMinRef.current += (targetMin - animatedMinRef.current) * 0.05;
+    animatedMaxRef.current += (targetMax - animatedMaxRef.current) * 0.05;
+
+    const minMultiplier = animatedMinRef.current;
+    const maxMultiplier = animatedMaxRef.current;
+
     const scaleY = (val: number) =>
       height -
       ((val - minMultiplier) / (maxMultiplier - minMultiplier)) * height;
 
-    // Grid + Y labels
+    // --- Grid + Y labels ---
     ctx.strokeStyle = "#2a2d3a";
     ctx.fillStyle = "#9ca3af";
     ctx.font = "14px Inter";
@@ -123,22 +135,23 @@ export default function Home() {
       ctx.fillText(value.toFixed(2) + "x", LEFT_PADDING - 10, y);
     }
 
-    // Draw candles based on delta
+    // --- Draw candles ---
     const visibleData = data.slice(-MAX_VISIBLE_CANDLES);
-    let lastValue = visibleData[0]; // starting point for first candle
+    let lastValue = visibleData[0];
 
-    visibleData.forEach((val, idx) => {
-      const open = lastValue;
-      const close = val;
-      const high = Math.max(open, close);
-      const low = Math.min(open, close);
-      const x = LEFT_PADDING + idx * CANDLE_WIDTH;
-
+    const drawCandle = (
+      x: number,
+      open: number,
+      close: number,
+      high: number,
+      low: number,
+      color: string,
+      isForming: boolean = false
+    ) => {
       const yOpen = scaleY(open);
       const yClose = scaleY(close);
       const yHigh = scaleY(high);
       const yLow = scaleY(low);
-      const color = close >= open ? "#22c55e" : "#ef4444";
 
       // Wick
       ctx.beginPath();
@@ -149,60 +162,93 @@ export default function Home() {
       ctx.stroke();
 
       // Body
+      let bodyTop = Math.min(yOpen, yClose);
+      let bodyHeight = Math.max(Math.abs(yClose - yOpen), 2);
+
+      // Animate forming candle
+      if (isForming) {
+        const prevClose = lastValue || open;
+        const targetHeight = Math.max(Math.abs(scaleY(prevClose) - yClose), 2);
+        const targetTop = Math.min(scaleY(prevClose), yClose);
+        bodyTop += (targetTop - bodyTop) * 0.2;
+        bodyHeight += (targetHeight - bodyHeight) * 0.2;
+      }
+
+      const radius = 4; // rounded edges
       ctx.fillStyle = color;
-      ctx.fillRect(
-        x,
-        Math.min(yOpen, yClose),
-        CANDLE_WIDTH - 2,
-        Math.max(Math.abs(yClose - yOpen), 2)
-      );
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(x, bodyTop, CANDLE_WIDTH - 2, bodyHeight, radius);
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, bodyTop, CANDLE_WIDTH - 2, bodyHeight);
+      }
+    };
+
+    visibleData.forEach((val, idx) => {
+      const open = lastValue;
+      const close = val;
+      const high = Math.max(open, close);
+      const low = Math.min(open, close);
+      const x = LEFT_PADDING + idx * CANDLE_WIDTH;
+      const color = close >= open ? "#22c55e" : "#ef4444";
+
+      drawCandle(x, open, close, high, low, color);
 
       lastValue = val;
     });
 
-    // Forming candle (smooth from last point)
-    const formingOpen = lastValue;
-    const formingClose = current;
-    const formingHigh = Math.max(formingOpen, formingClose);
-    const formingLow = Math.min(formingOpen, formingClose);
-    const x = LEFT_PADDING + visibleData.length * CANDLE_WIDTH; // next candle
-
-    const yOpen = scaleY(formingOpen);
-    const yClose = scaleY(formingClose);
-    const yHigh = scaleY(formingHigh);
-    const yLow = scaleY(formingLow);
-    const color = formingClose >= formingOpen ? "#22c55e" : "#ef4444";
-
-    ctx.beginPath();
-    ctx.moveTo(x + CANDLE_WIDTH / 2, yHigh);
-    ctx.lineTo(x + CANDLE_WIDTH / 2, yLow);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = color;
-    ctx.fillRect(
-      x,
-      Math.min(yOpen, yClose),
-      CANDLE_WIDTH - 2,
-      Math.max(Math.abs(yClose - yOpen), 2)
+    // --- Forming candle ---
+    drawCandle(
+      LEFT_PADDING + visibleData.length * CANDLE_WIDTH,
+      lastValue,
+      current,
+      Math.max(lastValue, current),
+      Math.min(lastValue, current),
+      current >= lastValue ? "#22c55e" : "#ef4444",
+      true
     );
 
-    // Dotted line for current multiplier
+    // --- Dotted line ---
     const yCurrent = scaleY(current);
     ctx.setLineDash([6, 6]);
     ctx.beginPath();
     ctx.moveTo(LEFT_PADDING, yCurrent);
     ctx.lineTo(width, yCurrent);
-    ctx.strokeStyle = "#fbbf24";
+    ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = "#fbbf24";
-    ctx.font = "bold 14px Inter";
+    // --- Multiplier label ---
+    const label = `${current.toFixed(3)}x`;
+    ctx.font = "bold 25px Inter";
+    ctx.textBaseline = "middle";
     ctx.textAlign = "left";
-    ctx.fillText(`${current.toFixed(3)}x`, LEFT_PADDING + 6, yCurrent - 8);
+
+    const gap = 4;
+    const visibleCount = Math.max(0, visibleData.length);
+
+    let estX = LEFT_PADDING + visibleCount * (CANDLE_WIDTH + gap) + 8;
+    const textWidth = ctx.measureText(label).width;
+    const rightMargin = 12;
+    if (estX + textWidth + rightMargin > width) {
+      estX = width - textWidth - rightMargin;
+      if (estX < LEFT_PADDING + 8) estX = LEFT_PADDING + 8;
+    }
+
+    const boxPadX = 8;
+    const boxPadY = 6;
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(
+      estX - boxPadX,
+      yCurrent - 12 - boxPadY / 2,
+      textWidth + boxPadX * 2,
+      24 + boxPadY
+    );
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, estX, yCurrent);
   };
 
   useEffect(() => {

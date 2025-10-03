@@ -27,7 +27,7 @@ wss.on("connection", (ws) => {
       clearInterval(interval);
       ws.close();
     }
-  }, 500); // tick every 250ms
+  }, 700); // tick every 250ms
 
   ws.on("close", () => {
     console.log("Client disconnected");
