@@ -8,6 +8,11 @@ interface Trade {
   pnl?: number;
 }
 
+interface UserTrades {
+  userId: string;
+  trades: Trade[];
+}
+
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -18,7 +23,8 @@ export default function Home() {
   );
   const [trades, setTrades] = useState<Trade[]>([]);
   const historyRef = useRef<number[]>([]);
-
+  const [history, setHistory] = useState<number[]>([]);
+  const [allUserTrades, setAllUserTrades] = useState<UserTrades[]>([]);
   // constants
   const CANDLE_WIDTH = 30;
   const GAP = 6;
@@ -30,8 +36,8 @@ export default function Home() {
   const targetMultiplierRef = useRef<number>(1.0);
   const animatedMinRef = useRef<number>(0.2);
   const animatedMaxRef = useRef<number>(2.0);
-
   // WebSocket connect
+  // --- WebSocket Connect ---
   const connectWS = () => {
     const ws = new WebSocket("ws://localhost:8080");
     wsRef.current = ws;
@@ -39,31 +45,38 @@ export default function Home() {
     ws.onopen = () => {
       console.log("Connected to WS");
       setGameState("ACTIVE");
-      // Keep history from previous round cleared by restart logic if desired
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        const val = Number(data.multiplier);
-        const state = data.state;
 
-        // update raw state (for display or external logic)
-        setCurrentMultiplier(val);
+        // Handle tick updates
+        if (data.type === "tick") {
+          const val = Number(data.multiplier);
+          const state = data.state;
 
-        // update target for smooth animation
-        targetMultiplierRef.current = val;
+          targetMultiplierRef.current = val;
+          setCurrentMultiplier(val);
 
-        // append to history (server sends one tick at a time)
-        historyRef.current = [...historyRef.current, val].slice(-1000);
-        if (state === "CRASHED") {
-          setGameState("CRASHED");
-          // optionally close ws (server may already close)
-          try {
-            ws.close();
-          } catch {}
-        } else {
-          setGameState("ACTIVE");
+          historyRef.current = [...historyRef.current, val].slice(-1000);
+          setHistory(historyRef.current);
+
+          if (state === "CRASHED") {
+            setGameState("CRASHED");
+          } else {
+            setGameState("ACTIVE");
+          }
+        }
+
+        // Handle trade updates from server
+        if (data.type === "trade-update") {
+          const { userId, trades: updatedTrades } = data;
+          setAllUserTrades((prev) => {
+            const copy = prev.filter((u) => u.userId !== userId);
+            copy.push({ userId, trades: updatedTrades });
+            return copy;
+          });
         }
       } catch (e) {
         console.error("Invalid WS message", e);
@@ -81,13 +94,11 @@ export default function Home() {
     };
   };
 
-  // start WS once
   useEffect(() => {
     connectWS();
     return () => {
       wsRef.current?.close();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const restartGame = () => {
@@ -104,16 +115,17 @@ export default function Home() {
     setTimeout(() => connectWS(), 500);
   };
 
-  // BUY: record the visible animated multiplier (what user sees)
   const handleBuy = () => {
     const visiblePrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
-    setTrades((prev) => [
-      ...prev,
-      { id: Date.now() + Math.floor(Math.random() * 1000), buy: visiblePrice },
-    ]);
+    const trade: Trade = { id: Date.now(), buy: visiblePrice };
+    setTrades((prev) => [...prev, trade]);
+
+    // send buy to server
+    wsRef.current?.send(
+      JSON.stringify({ type: "trade", action: "buy", trade })
+    );
   };
 
-  // SELL: only close the most recent open trade
   const handleSell = () => {
     const visiblePrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
     setTrades((prev) => {
@@ -122,11 +134,20 @@ export default function Home() {
         if (copy[i].sell === undefined) {
           const pnl = ((visiblePrice - copy[i].buy) / copy[i].buy) * 100;
           copy[i] = { ...copy[i], sell: visiblePrice, pnl };
-          break; // only close one trade
+          break; // sell only one trade
         }
       }
       return copy;
     });
+
+    // send sell to server
+    wsRef.current?.send(
+      JSON.stringify({
+        type: "trade",
+        action: "sell",
+        trade: { sell: visiblePrice },
+      })
+    );
   };
 
   // helper: rounded rect (cross-browser)
@@ -447,7 +468,7 @@ export default function Home() {
             </button>
           </div>
 
-          <table className="w-full text-sm text-white">
+          {/* <table className="w-full text-sm text-white">
             <thead>
               <tr className="text-gray-400">
                 <th className="text-left">Buy</th>
@@ -497,7 +518,23 @@ export default function Home() {
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </table> */}
+          <div className="mt-4 w-full max-w-2xl bg-[#0f1118] p-4 rounded-lg">
+            <h2 className="text-white font-bold mb-2">Leaderboard / Trades</h2>
+            {allUserTrades.map((u) => (
+              <div key={u.userId} className="text-white mb-2">
+                <strong>{u.userId}</strong>
+                <ul>
+                  {u.trades.map((t) => (
+                    <li key={t.id}>
+                      Buy: {t.buy} | Sell: {t.sell ?? "-"} | PnL:{" "}
+                      {t.pnl?.toFixed(2) ?? "-"}%
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
