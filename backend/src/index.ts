@@ -13,6 +13,17 @@ interface User {
   trades: Trade[];
 }
 
+interface GameTick {
+  time: number;
+  value: number;
+}
+
+interface GameHistory {
+  id: number;
+  crashedAt: number;
+  ticks: GameTick[];
+}
+
 const wss = new WebSocketServer({ port: 8080 });
 
 let tickGenerator: ReturnType<typeof createTickGenerator>;
@@ -22,14 +33,11 @@ let timer = 0;
 let gameInterval: any;
 let timerInterval: any;
 
-interface Tick {
-  time: number;
-  value: number;
-}
-// Only keep trades for the active game
 let users: User[] = [];
-let currentGameTicks: Tick[] = []; // holds tick history of current game
+let currentGameTicks: GameTick[] = [];
+let previousGames: GameHistory[] = []; // holds last 10 games only
 
+// --- Broadcast Helper ---
 const broadcast = (data: any) => {
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
@@ -38,19 +46,24 @@ const broadcast = (data: any) => {
   });
 };
 
+// --- Start Game ---
 const startGame = () => {
-  console.log("🎮 Starting new game...");
-  users = []; // Reset all trades for the new round
-
+  console.log("🚀 Game started");
+  // Reset per-game state
+  users = [];
+  currentGameTicks = [];
   tickGenerator = createTickGenerator();
   gameState = "ACTIVE";
 
+  // Tick generator loop
   gameInterval = setInterval(() => {
     const tick = tickGenerator();
     currentMultiplier = tick.value;
 
+    // Record tick
     currentGameTicks.push({ time: Date.now(), value: currentMultiplier });
 
+    // Broadcast live tick
     broadcast({
       type: "tick",
       multiplier: currentMultiplier,
@@ -58,19 +71,33 @@ const startGame = () => {
       timer: 0,
     });
 
+    // --- Crash ---
     if (tick.crashed) {
       clearInterval(gameInterval);
       gameState = "CRASHED";
-      console.log(`💥 Game crashed at ${currentMultiplier}x`);
+      console.log(`💥 Game crashed at multiplier: ${currentMultiplier}`);
 
+      // Save finished game to history
+      previousGames.push({
+        id: Date.now(),
+        crashedAt: currentMultiplier,
+        ticks: [...currentGameTicks],
+      });
+
+      // Keep only last 10 games
+      if (previousGames.length > 10) {
+        previousGames.shift();
+      }
+
+      // Broadcast crash
       broadcast({
         type: "tick",
         multiplier: currentMultiplier,
-        state: gameState,
+        state: "CRASHED",
         timer: 0,
       });
 
-      // Start waiting phase before next game
+      // Start waiting phase (8s)
       timer = 8;
       timerInterval = setInterval(() => {
         broadcast({
@@ -81,36 +108,34 @@ const startGame = () => {
         });
         timer--;
 
+        // New game after countdown
         if (timer < 0) {
           clearInterval(timerInterval);
-          startGame(); // restart
+          startGame();
         }
       }, 1000);
     }
   }, 500);
 };
 
+// --- WebSocket Connection ---
 wss.on("connection", (ws) => {
   console.log("🟢 New client connected");
 
-  // Send current state immediately
+  // Send initial state & recent game history
   ws.send(
     JSON.stringify({
       type: "init",
       multiplier: currentMultiplier,
       state: gameState,
       timer,
+      allUserTrades: users,
+      previousGames,
+      currentGameTicks, // include current round tick data for redraws
     })
   );
-  if (currentGameTicks.length > 0) {
-    ws.send(
-      JSON.stringify({
-        type: "tick-restore",
-        ticks: currentGameTicks,
-      })
-    );
-  }
-  // Broadcast number of connected clients
+
+  // Update live user count
   broadcast({
     type: "client-count",
     count: wss.clients.size,
@@ -119,13 +144,10 @@ wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     try {
       const data = JSON.parse(message.toString());
-
-      // 🧩 Step 1: Identify or reconnect user
+      // --- Identify / Reconnect user ---
       if (data.type === "identify") {
         const user = users.find((u) => u.userId === data.userId);
-        console.log(`User Found ?`, user);
         if (user) {
-          // send them back their current trades
           ws.send(
             JSON.stringify({
               type: "trade-restore",
@@ -133,20 +155,20 @@ wss.on("connection", (ws) => {
               trades: user.trades,
             })
           );
-          if (currentGameTicks.length > 0) {
-            ws.send(
-              JSON.stringify({
-                type: "tick-restore",
-                ticks: currentGameTicks,
-              })
-            );
-          }
         }
+
+        // Send current tick data for chart redraw
+        ws.send(
+          JSON.stringify({
+            type: "tick-restore",
+            ticks: currentGameTicks,
+          })
+        );
+
         return;
       }
-
-      // 🟢 BUY
-      if (data.type === "buy" && gameState === "ACTIVE") {
+      // --- BUY ---
+      if (data.type === "buy") {
         let user = users.find((u) => u.userId === data.userId);
         if (!user) {
           user = { userId: data.userId, trades: [] };
@@ -162,9 +184,8 @@ wss.on("connection", (ws) => {
           trades: user.trades,
         });
       }
-
-      // 🔴 SELL
-      if (data.type === "sell" && gameState === "ACTIVE") {
+      // --- SELL ---
+      if (data.type === "sell") {
         const user = users.find((u) => u.userId === data.userId);
         if (!user) return;
 
@@ -180,18 +201,15 @@ wss.on("connection", (ws) => {
           trades: user.trades,
         });
       }
-    } catch (e) {
-      console.error("❌ Invalid WS message:", e);
+    } catch (err) {
+      console.error("❌ Invalid WS message:", err);
     }
   });
 
-  ws.on("close", () => {
-    console.log("🔴 Client disconnected");
-    broadcast({
-      type: "client-count",
-      count: wss.clients.size - 1,
-    });
-  });
+  ws.on("close", () => console.log("🔴 Client disconnected"));
 });
 
+// --- Start first game ---
 startGame();
+
+console.log("✅ WebSocket server running on ws://localhost:8080");

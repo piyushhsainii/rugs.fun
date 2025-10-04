@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Leaderboard from "./components/leaderboard";
+import useGameWebSocket from "./hooks/socket";
 
 interface Trade {
   id: number;
@@ -11,24 +12,11 @@ interface Trade {
   pnl?: number;
 }
 
-interface UserTrades {
-  userId: string;
-  trades: Trade[];
-}
-
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const [clientsConnected, setclientsConnected] = useState(0);
-  const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.0);
-  const [gameState, setGameState] = useState<"WAITING" | "ACTIVE" | "CRASHED">(
-    "WAITING"
-  );
   const [Countdown, setCountdown] = useState(0);
   const [trades, setTrades] = useState<Trade[]>([]);
-  const historyRef = useRef<number[]>([]);
-  const [history, setHistory] = useState<number[]>([]);
-  const [allUserTrades, setAllUserTrades] = useState<UserTrades[]>([]);
   // constants
   const CANDLE_WIDTH = 30;
   const GAP = 6;
@@ -37,115 +25,30 @@ export default function Home() {
   const wallet = useWallet();
   // animation refs
   const animatedMultiplierRef = useRef<number>(1.0);
-  const targetMultiplierRef = useRef<number>(1.0);
   const animatedMinRef = useRef<number>(0.2);
   const animatedMaxRef = useRef<number>(2.0);
-  const userId = localStorage.getItem("userId");
-  // --- WebSocket Connect ---
-  const connectWS = () => {
-    const ws = new WebSocket("ws://localhost:8080");
-    wsRef.current = ws;
-    ws.onopen = () => {
-      console.log("Connected to WS");
-      setGameState("ACTIVE");
-      ws.send(JSON.stringify({ type: "identify", userId }));
-      console.log("Sent identification", userId);
-    };
-    // client-count
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
 
-        if (data.type === "client-count") {
-          console.log("Connected clients:", data.count);
-          setclientsConnected(data.count);
-        }
-        // Restoring user trades
-        if (data.type === "trade-restore" && data.userId === userId) {
-          console.log("trade-restored", data.trades);
-
-          setAllUserTrades((prev) => {
-            // If allUserTrades is shaped like [{ userId, trades }]
-            const existing = prev.find((u) => u.userId === data.userId);
-
-            if (existing) {
-              // Replace that user's trades entirely
-              return prev.map((u) =>
-                u.userId === data.userId ? { ...u, trades: data.trades } : u
-              );
-            } else {
-              // Add new user entry
-              return [...prev, data];
-            }
-          });
-        }
-        if (data.type === "tick-restore") {
-          historyRef.current = [...data.ticks.map((t: any) => t.value)];
-          setHistory([...historyRef.current]);
-        }
-        // Handle tick updates
-        if (data.type === "tick") {
-          const state = data.state;
-
-          targetMultiplierRef.current = Number(data.multiplier);
-          historyRef.current = [
-            ...historyRef.current,
-            targetMultiplierRef.current,
-          ].slice(-1000);
-          setHistory([...historyRef.current]);
-
-          if (state === "CRASHED") {
-            setGameState("CRASHED");
-          } else if (state === "WAITING") {
-            setGameState("WAITING");
-          } else {
-            setGameState("ACTIVE");
-          }
-        }
-
-        // Handle trade updates from server
-        if (data.type === "trade-update") {
-          const { userId, trades } = data;
-
-          setAllUserTrades((prev) => {
-            const exists = prev.find((u) => u.userId === userId);
-            if (exists) {
-              return prev.map((u) =>
-                u.userId === userId ? { userId, trades } : u
-              );
-            } else {
-              return [...prev, { userId, trades }];
-            }
-          });
-        }
-      } catch (e) {
-        console.error("Invalid WS message", e);
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.error("WS error:", err);
-      setGameState("CRASHED");
-    };
-
-    ws.onclose = () => {
-      console.log("WS closed");
-      setGameState((s) => (s === "ACTIVE" ? "CRASHED" : s));
-    };
-  };
+  const {
+    allUserTrades,
+    gameState,
+    history,
+    previousGames,
+    historyRef,
+    setGameState,
+    targetMultiplierRef,
+    clientsConnected,
+  } = useGameWebSocket();
 
   const restartGame = () => {
     wsRef.current?.close();
     historyRef.current = [];
     setTrades([]);
-    setCurrentMultiplier(1.0);
     animatedMultiplierRef.current = 1.0;
-    targetMultiplierRef.current = 1.0;
     animatedMinRef.current = 0.2;
     animatedMaxRef.current = 2.0;
     setGameState("WAITING");
     // reconnect shortly
-    setTimeout(() => connectWS(), 500);
+    // setTimeout(() => connectWS(), 500);
   };
 
   const handleBuy = () => {
@@ -190,6 +93,7 @@ export default function Home() {
 
   // Main draw function — contains candles + fluid curve + dotted label
   const drawChart = useCallback(() => {
+    console.log("draw");
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -400,11 +304,7 @@ export default function Home() {
   const animationStarted = useRef(false);
 
   useEffect(() => {
-    if (animationStarted.current) return; // Guard: only start once
-    animationStarted.current = true;
-
     let raf: number;
-
     const loop = () => {
       drawChart();
       raf = requestAnimationFrame(loop);
@@ -416,24 +316,10 @@ export default function Home() {
       animationStarted.current = false; // allow restart on real unmount
     };
   }, []);
-  const initialized = useRef(false);
 
   if (wallet && wallet.publicKey) {
     localStorage.setItem("userId", wallet.publicKey.toBase58());
   }
-
-  useEffect(() => {
-    console.log("OH");
-    if (initialized.current) return;
-    initialized.current = true;
-
-    connectWS();
-
-    return () => {
-      wsRef.current?.close();
-      initialized.current = false;
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-[#1a1d29] flex items-start justify-center p-6">
@@ -463,10 +349,12 @@ export default function Home() {
           <div className="text-center mt-4">
             <div
               className={`text-6xl font-bold ${
-                currentMultiplier >= 1 ? "text-green-500" : "text-red-500"
+                targetMultiplierRef.current >= 1
+                  ? "text-green-500"
+                  : "text-red-500"
               }`}
             >
-              {currentMultiplier.toFixed(3)}x
+              {targetMultiplierRef.current.toFixed(3)}x
             </div>
             <div className="text-white mt-2">
               {gameState === "ACTIVE" && "Round in Progress..."}
