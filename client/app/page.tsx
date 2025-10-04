@@ -86,7 +86,7 @@ export default function Home() {
     const width = canvas.width;
     const height = canvas.height;
 
-    // Smooth animation of current multiplier
+    // Smooth multiplier animation
     animatedMultiplierRef.current +=
       (targetMultiplierRef.current - animatedMultiplierRef.current) * 0.08;
     const current = animatedMultiplierRef.current;
@@ -98,9 +98,9 @@ export default function Home() {
     const data = historyRef.current;
     if (!data.length) return;
 
-    // --- Dynamic Y-axis with smooth scaling ---
-    const DEFAULT_MIN = 0.2;
-    const DEFAULT_MAX = 2.0;
+    // --- Dynamic Y-axis ---
+    const DEFAULT_MIN = 0.5;
+    const DEFAULT_MAX = 1.5;
 
     const rawMax = Math.max(...data, current);
     const rawMin = Math.min(...data, current);
@@ -139,6 +139,28 @@ export default function Home() {
     const visibleData = data.slice(-MAX_VISIBLE_CANDLES);
     let lastValue = visibleData[0];
 
+    const drawRoundedRect = (
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      r: number,
+      color: string
+    ) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.fillStyle = color;
+      ctx.fill();
+    };
+
     const drawCandle = (
       x: number,
       open: number,
@@ -161,11 +183,10 @@ export default function Home() {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Body
+      // --- Animate forming candle body height ---
       let bodyTop = Math.min(yOpen, yClose);
       let bodyHeight = Math.max(Math.abs(yClose - yOpen), 2);
 
-      // Animate forming candle
       if (isForming) {
         const prevClose = lastValue || open;
         const targetHeight = Math.max(Math.abs(scaleY(prevClose) - yClose), 2);
@@ -174,15 +195,8 @@ export default function Home() {
         bodyHeight += (targetHeight - bodyHeight) * 0.2;
       }
 
-      const radius = 4; // rounded edges
-      ctx.fillStyle = color;
-      if (ctx.roundRect) {
-        ctx.beginPath();
-        ctx.roundRect(x, bodyTop, CANDLE_WIDTH - 2, bodyHeight, radius);
-        ctx.fill();
-      } else {
-        ctx.fillRect(x, bodyTop, CANDLE_WIDTH - 2, bodyHeight);
-      }
+      // Rounded body
+      drawRoundedRect(x, bodyTop, CANDLE_WIDTH - 2, bodyHeight, 4, color);
     };
 
     visibleData.forEach((val, idx) => {
@@ -194,13 +208,13 @@ export default function Home() {
       const color = close >= open ? "#22c55e" : "#ef4444";
 
       drawCandle(x, open, close, high, low, color);
-
       lastValue = val;
     });
 
     // --- Forming candle ---
+    const lastX = LEFT_PADDING + visibleData.length * CANDLE_WIDTH;
     drawCandle(
-      LEFT_PADDING + visibleData.length * CANDLE_WIDTH,
+      lastX,
       lastValue,
       current,
       Math.max(lastValue, current),
@@ -208,6 +222,37 @@ export default function Home() {
       current >= lastValue ? "#22c55e" : "#ef4444",
       true
     );
+
+    // --- Fluid curve animation (Bezier) ---
+    ctx.beginPath();
+    ctx.moveTo(LEFT_PADDING, scaleY(visibleData[0]));
+
+    for (let i = 1; i < visibleData.length; i++) {
+      const xPrev = LEFT_PADDING + (i - 1) * CANDLE_WIDTH + CANDLE_WIDTH / 2;
+      const xCurr = LEFT_PADDING + i * CANDLE_WIDTH + CANDLE_WIDTH / 2;
+      const yPrev = scaleY(visibleData[i - 1]);
+      const yCurr = scaleY(visibleData[i]);
+
+      const cpX = (xPrev + xCurr) / 2;
+      ctx.bezierCurveTo(cpX, yPrev, cpX, yCurr, xCurr, yCurr);
+    }
+
+    // Forming candle curve extension
+    const xLast = lastX + CANDLE_WIDTH / 2;
+    const yLast = scaleY(visibleData[visibleData.length - 1]);
+    const cpMid = (xLast + (lastX + CANDLE_WIDTH)) / 2;
+    ctx.bezierCurveTo(
+      cpMid,
+      yLast,
+      cpMid,
+      scaleY(current),
+      lastX + CANDLE_WIDTH,
+      scaleY(current)
+    );
+
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
     // --- Dotted line ---
     const yCurrent = scaleY(current);
@@ -228,7 +273,6 @@ export default function Home() {
 
     const gap = 4;
     const visibleCount = Math.max(0, visibleData.length);
-
     let estX = LEFT_PADDING + visibleCount * (CANDLE_WIDTH + gap) + 8;
     const textWidth = ctx.measureText(label).width;
     const rightMargin = 12;
