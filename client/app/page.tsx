@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { Label } from "@/components/ui/label";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Trade {
   id: number;
@@ -16,11 +18,12 @@ interface UserTrades {
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-
+  const [clientsConnected, setclientsConnected] = useState(0);
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.0);
   const [gameState, setGameState] = useState<"WAITING" | "ACTIVE" | "CRASHED">(
     "WAITING"
   );
+  const [Countdown, setCountdown] = useState(0);
   const [trades, setTrades] = useState<Trade[]>([]);
   const historyRef = useRef<number[]>([]);
   const [history, setHistory] = useState<number[]>([]);
@@ -30,40 +33,47 @@ export default function Home() {
   const GAP = 6;
   const LEFT_PADDING = 60;
   const MAX_VISIBLE_CANDLES = 20;
-
+  const wallet = useWallet();
   // animation refs
   const animatedMultiplierRef = useRef<number>(1.0);
   const targetMultiplierRef = useRef<number>(1.0);
   const animatedMinRef = useRef<number>(0.2);
   const animatedMaxRef = useRef<number>(2.0);
-  // WebSocket connect
+
   // --- WebSocket Connect ---
   const connectWS = () => {
     const ws = new WebSocket("ws://localhost:8080");
     wsRef.current = ws;
-
     ws.onopen = () => {
       console.log("Connected to WS");
       setGameState("ACTIVE");
     };
-
+    // client-count
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        if (data.type === "client-count") {
+          console.log("Connected clients:", data.count);
+          setclientsConnected(data.count);
+        }
 
         // Handle tick updates
         if (data.type === "tick") {
           const val = Number(data.multiplier);
           const state = data.state;
 
-          targetMultiplierRef.current = val;
-          setCurrentMultiplier(val);
-
-          historyRef.current = [...historyRef.current, val].slice(-1000);
-          setHistory(historyRef.current);
+          targetMultiplierRef.current = Number(data.multiplier);
+          historyRef.current = [
+            ...historyRef.current,
+            targetMultiplierRef.current,
+          ].slice(-1000);
+          setHistory([...historyRef.current]);
 
           if (state === "CRASHED") {
             setGameState("CRASHED");
+          } else if (state === "WAITING") {
+            setGameState("WAITING");
           } else {
             setGameState("ACTIVE");
           }
@@ -71,11 +81,17 @@ export default function Home() {
 
         // Handle trade updates from server
         if (data.type === "trade-update") {
-          const { userId, trades: updatedTrades } = data;
+          const { userId, trades } = data;
+
           setAllUserTrades((prev) => {
-            const copy = prev.filter((u) => u.userId !== userId);
-            copy.push({ userId, trades: updatedTrades });
-            return copy;
+            const exists = prev.find((u) => u.userId === userId);
+            if (exists) {
+              return prev.map((u) =>
+                u.userId === userId ? { userId, trades } : u
+              );
+            } else {
+              return [...prev, { userId, trades }];
+            }
           });
         }
       } catch (e) {
@@ -94,12 +110,7 @@ export default function Home() {
     };
   };
 
-  useEffect(() => {
-    connectWS();
-    return () => {
-      wsRef.current?.close();
-    };
-  }, []);
+  console.log("💥 component rendering");
 
   const restartGame = () => {
     wsRef.current?.close();
@@ -116,37 +127,18 @@ export default function Home() {
   };
 
   const handleBuy = () => {
-    const visiblePrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
-    const trade: Trade = { id: Date.now(), buy: visiblePrice };
-    setTrades((prev) => [...prev, trade]);
+    const userId = wallet.publicKey;
 
-    // send buy to server
-    wsRef.current?.send(
-      JSON.stringify({ type: "trade", action: "buy", trade })
-    );
+    const buyPrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
+    wsRef.current?.send(JSON.stringify({ type: "buy", userId, buy: buyPrice }));
   };
 
   const handleSell = () => {
-    const visiblePrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
-    setTrades((prev) => {
-      const copy = [...prev];
-      for (let i = copy.length - 1; i >= 0; i--) {
-        if (copy[i].sell === undefined) {
-          const pnl = ((visiblePrice - copy[i].buy) / copy[i].buy) * 100;
-          copy[i] = { ...copy[i], sell: visiblePrice, pnl };
-          break; // sell only one trade
-        }
-      }
-      return copy;
-    });
+    const userId = wallet.publicKey;
 
-    // send sell to server
+    const sellPrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
     wsRef.current?.send(
-      JSON.stringify({
-        type: "trade",
-        action: "sell",
-        trade: { sell: visiblePrice },
-      })
+      JSON.stringify({ type: "sell", userId, sell: sellPrice })
     );
   };
 
@@ -175,7 +167,7 @@ export default function Home() {
   };
 
   // Main draw function — contains candles + fluid curve + dotted label
-  const drawChart = () => {
+  const drawChart = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -382,18 +374,39 @@ export default function Home() {
 
     ctx.fillStyle = "#ffffff";
     ctx.fillText(label, estX, yCurrent);
-  };
+  }, []);
+  const animationStarted = useRef(false);
 
-  // animation loop
   useEffect(() => {
-    let raf = 0;
+    if (animationStarted.current) return; // Guard: only start once
+    animationStarted.current = true;
+
+    let raf: number;
+
     const loop = () => {
       drawChart();
       raf = requestAnimationFrame(loop);
     };
     loop();
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      cancelAnimationFrame(raf);
+      animationStarted.current = false; // allow restart on real unmount
+    };
+  }, []);
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    console.log("OH");
+    if (initialized.current) return;
+    initialized.current = true;
+
+    connectWS();
+
+    return () => {
+      wsRef.current?.close();
+      initialized.current = false;
+    };
   }, []);
 
   return (
@@ -407,7 +420,11 @@ export default function Home() {
               Balance: <span className="text-yellow-400">98.138</span>
             </div>
           </div>
-
+          <div className="text-white flex items-center my-1">
+            {" "}
+            <span className="inline-block w-2 h-2 bg-green-600 rounded-full m-1"></span>
+            <Label htmlFor="">{clientsConnected} users online</Label>
+          </div>
           <div className="bg-[#0f1118] rounded-lg p-4 relative">
             <canvas
               ref={canvasRef}
@@ -467,58 +484,6 @@ export default function Home() {
               Clear
             </button>
           </div>
-
-          {/* <table className="w-full text-sm text-white">
-            <thead>
-              <tr className="text-gray-400">
-                <th className="text-left">Buy</th>
-                <th className="text-left">Sell</th>
-                <th className="text-right">P/L%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trades.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="text-center text-gray-500 py-3">
-                    No trades yet
-                  </td>
-                </tr>
-              )}
-              {trades
-                .slice()
-                .reverse()
-                .map((t) => (
-                  <tr
-                    key={t.id}
-                    className={`border-t border-gray-700 ${
-                      t.sell === undefined ? "bg-[#081018]" : ""
-                    }`}
-                  >
-                    <td className="py-2">{t.buy.toFixed(3)}x</td>
-                    <td className="py-2">
-                      {t.sell ? (
-                        `${t.sell.toFixed(3)}x`
-                      ) : (
-                        <span className="text-gray-400">OPEN</span>
-                      )}
-                    </td>
-                    <td
-                      className={`py-2 text-right ${
-                        t.pnl !== undefined
-                          ? t.pnl > 0
-                            ? "text-green-400"
-                            : t.pnl < 0
-                            ? "text-red-400"
-                            : "text-gray-400"
-                          : "text-gray-400"
-                      }`}
-                    >
-                      {t.pnl !== undefined ? `${t.pnl.toFixed(2)}%` : "-"}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table> */}
           <div className="mt-4 w-full max-w-2xl bg-[#0f1118] p-4 rounded-lg">
             <h2 className="text-white font-bold mb-2">Leaderboard / Trades</h2>
             {allUserTrades.map((u) => (
