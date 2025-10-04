@@ -22,8 +22,13 @@ let timer = 0;
 let gameInterval: any;
 let timerInterval: any;
 
+interface Tick {
+  time: number;
+  value: number;
+}
 // Only keep trades for the active game
 let users: User[] = [];
+let currentGameTicks: Tick[] = []; // holds tick history of current game
 
 const broadcast = (data: any) => {
   wss.clients.forEach((client) => {
@@ -43,6 +48,8 @@ const startGame = () => {
   gameInterval = setInterval(() => {
     const tick = tickGenerator();
     currentMultiplier = tick.value;
+
+    currentGameTicks.push({ time: Date.now(), value: currentMultiplier });
 
     broadcast({
       type: "tick",
@@ -95,7 +102,14 @@ wss.on("connection", (ws) => {
       timer,
     })
   );
-
+  if (currentGameTicks.length > 0) {
+    ws.send(
+      JSON.stringify({
+        type: "tick-restore",
+        ticks: currentGameTicks,
+      })
+    );
+  }
   // Broadcast number of connected clients
   broadcast({
     type: "client-count",
@@ -119,6 +133,14 @@ wss.on("connection", (ws) => {
               trades: user.trades,
             })
           );
+          if (currentGameTicks.length > 0) {
+            ws.send(
+              JSON.stringify({
+                type: "tick-restore",
+                ticks: currentGameTicks,
+              })
+            );
+          }
         }
         return;
       }

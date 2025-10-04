@@ -79,7 +79,10 @@ export default function Home() {
             }
           });
         }
-
+        if (data.type === "tick-restore") {
+          historyRef.current = [...data.ticks.map((t: any) => t.value)];
+          setHistory([...historyRef.current]);
+        }
         // Handle tick updates
         if (data.type === "tick") {
           const state = data.state;
