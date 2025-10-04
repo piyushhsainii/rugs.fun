@@ -2,6 +2,7 @@
 import { Label } from "@/components/ui/label";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Leaderboard from "./components/leaderboard";
 
 interface Trade {
   id: number;
@@ -39,7 +40,7 @@ export default function Home() {
   const targetMultiplierRef = useRef<number>(1.0);
   const animatedMinRef = useRef<number>(0.2);
   const animatedMaxRef = useRef<number>(2.0);
-
+  const userId = localStorage.getItem("userId");
   // --- WebSocket Connect ---
   const connectWS = () => {
     const ws = new WebSocket("ws://localhost:8080");
@@ -47,6 +48,8 @@ export default function Home() {
     ws.onopen = () => {
       console.log("Connected to WS");
       setGameState("ACTIVE");
+      ws.send(JSON.stringify({ type: "identify", userId }));
+      console.log("Sent identification", userId);
     };
     // client-count
     ws.onmessage = (event) => {
@@ -57,10 +60,28 @@ export default function Home() {
           console.log("Connected clients:", data.count);
           setclientsConnected(data.count);
         }
+        // Restoring user trades
+        if (data.type === "trade-restore" && data.userId === userId) {
+          console.log("trade-restored", data.trades);
+
+          setAllUserTrades((prev) => {
+            // If allUserTrades is shaped like [{ userId, trades }]
+            const existing = prev.find((u) => u.userId === data.userId);
+
+            if (existing) {
+              // Replace that user's trades entirely
+              return prev.map((u) =>
+                u.userId === data.userId ? { ...u, trades: data.trades } : u
+              );
+            } else {
+              // Add new user entry
+              return [...prev, data];
+            }
+          });
+        }
 
         // Handle tick updates
         if (data.type === "tick") {
-          const val = Number(data.multiplier);
           const state = data.state;
 
           targetMultiplierRef.current = Number(data.multiplier);
@@ -109,8 +130,6 @@ export default function Home() {
       setGameState((s) => (s === "ACTIVE" ? "CRASHED" : s));
     };
   };
-
-  console.log("💥 component rendering");
 
   const restartGame = () => {
     wsRef.current?.close();
@@ -396,6 +415,10 @@ export default function Home() {
   }, []);
   const initialized = useRef(false);
 
+  if (wallet && wallet.publicKey) {
+    localStorage.setItem("userId", wallet.publicKey.toBase58());
+  }
+
   useEffect(() => {
     console.log("OH");
     if (initialized.current) return;
@@ -472,35 +495,19 @@ export default function Home() {
         </div>
 
         {/* Right: Leaderboard */}
-        <div className="w-72 bg-[#0f1118] rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-white text-lg font-bold">Trade History</h2>
-            <button
-              onClick={() => {
-                setTrades([]);
-              }}
-              className="text-xs text-gray-400 hover:text-white"
-            >
-              Clear
-            </button>
+        <main className="p-6 md:p-10">
+          <div className="max-w-5xl mx-auto">
+            <header className="mb-6">
+              <h1 className="text-2xl font-semibold text-foreground text-pretty">
+                Leaderboard
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Recent trades across top participants
+              </p>
+            </header>
+            <Leaderboard data={allUserTrades} />
           </div>
-          <div className="mt-4 w-full max-w-2xl bg-[#0f1118] p-4 rounded-lg">
-            <h2 className="text-white font-bold mb-2">Leaderboard / Trades</h2>
-            {allUserTrades.map((u) => (
-              <div key={u.userId} className="text-white mb-2">
-                <strong>{u.userId}</strong>
-                <ul>
-                  {u.trades.map((t) => (
-                    <li key={t.id}>
-                      Buy: {t.buy} | Sell: {t.sell ?? "-"} | PnL:{" "}
-                      {t.pnl?.toFixed(2) ?? "-"}%
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
+        </main>
       </div>
     </div>
   );

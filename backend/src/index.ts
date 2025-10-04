@@ -22,7 +22,7 @@ let timer = 0;
 let gameInterval: any;
 let timerInterval: any;
 
-// Only keep trades for current game
+// Only keep trades for the active game
 let users: User[] = [];
 
 const broadcast = (data: any) => {
@@ -34,10 +34,8 @@ const broadcast = (data: any) => {
 };
 
 const startGame = () => {
-  console.log("Game started");
-
-  // Reset current game trades
-  users = [];
+  console.log("🎮 Starting new game...");
+  users = []; // Reset all trades for the new round
 
   tickGenerator = createTickGenerator();
   gameState = "ACTIVE";
@@ -56,7 +54,7 @@ const startGame = () => {
     if (tick.crashed) {
       clearInterval(gameInterval);
       gameState = "CRASHED";
-      console.log(`Game crashed at multiplier: ${currentMultiplier}`);
+      console.log(`💥 Game crashed at ${currentMultiplier}x`);
 
       broadcast({
         type: "tick",
@@ -65,7 +63,7 @@ const startGame = () => {
         timer: 0,
       });
 
-      // Start 8-second WAITING timer
+      // Start waiting phase before next game
       timer = 8;
       timerInterval = setInterval(() => {
         broadcast({
@@ -78,7 +76,7 @@ const startGame = () => {
 
         if (timer < 0) {
           clearInterval(timerInterval);
-          startGame(); // start new game
+          startGame(); // restart
         }
       }, 1000);
     }
@@ -86,19 +84,19 @@ const startGame = () => {
 };
 
 wss.on("connection", (ws) => {
-  console.log("New client connected");
+  console.log("🟢 New client connected");
 
-  // Send initial state
+  // Send current state immediately
   ws.send(
     JSON.stringify({
       type: "init",
       multiplier: currentMultiplier,
       state: gameState,
       timer,
-      allUserTrades: users, // only current game trades
     })
   );
-  // return the no. of users connected
+
+  // Broadcast number of connected clients
   broadcast({
     type: "client-count",
     count: wss.clients.size,
@@ -108,18 +106,32 @@ wss.on("connection", (ws) => {
     try {
       const data = JSON.parse(message.toString());
 
-      // --- BUY ---
-      if (data.type === "buy") {
+      // 🧩 Step 1: Identify or reconnect user
+      if (data.type === "identify") {
+        const user = users.find((u) => u.userId === data.userId);
+        console.log(`User Found ?`, user);
+        if (user) {
+          // send them back their current trades
+          ws.send(
+            JSON.stringify({
+              type: "trade-restore",
+              userId: user.userId,
+              trades: user.trades,
+            })
+          );
+        }
+        return;
+      }
+
+      // 🟢 BUY
+      if (data.type === "buy" && gameState === "ACTIVE") {
         let user = users.find((u) => u.userId === data.userId);
         if (!user) {
           user = { userId: data.userId, trades: [] };
           users.push(user);
         }
 
-        const trade: Trade = {
-          id: Date.now(),
-          buy: data.buy,
-        };
+        const trade: Trade = { id: Date.now(), buy: data.buy };
         user.trades.push(trade);
 
         broadcast({
@@ -129,8 +141,8 @@ wss.on("connection", (ws) => {
         });
       }
 
-      // --- SELL ---
-      if (data.type === "sell") {
+      // 🔴 SELL
+      if (data.type === "sell" && gameState === "ACTIVE") {
         const user = users.find((u) => u.userId === data.userId);
         if (!user) return;
 
@@ -147,12 +159,17 @@ wss.on("connection", (ws) => {
         });
       }
     } catch (e) {
-      console.error("Invalid WS message:", e);
+      console.error("❌ Invalid WS message:", e);
     }
   });
 
-  ws.on("close", () => console.log("Client disconnected"));
+  ws.on("close", () => {
+    console.log("🔴 Client disconnected");
+    broadcast({
+      type: "client-count",
+      count: wss.clients.size - 1,
+    });
+  });
 });
 
-// Start the first game
 startGame();
