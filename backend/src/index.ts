@@ -59,7 +59,6 @@ const startGame = () => {
   gameInterval = setInterval(() => {
     const tick = tickGenerator();
     currentMultiplier = tick.value;
-
     // Record tick
     currentGameTicks.push({ time: Date.now(), value: currentMultiplier });
 
@@ -75,7 +74,7 @@ const startGame = () => {
     if (tick.crashed) {
       clearInterval(gameInterval);
       gameState = "CRASHED";
-      console.log(`💥 Game crashed at multiplier: ${currentMultiplier}`);
+      console.log(`💥Game crashed at multiplier: ${currentMultiplier}`);
 
       // Save finished game to history
       previousGames.push({
@@ -88,7 +87,7 @@ const startGame = () => {
       if (previousGames.length > 10) {
         previousGames.shift();
       }
-
+      currentGameTicks = [];
       // Broadcast crash
       broadcast({
         type: "tick",
@@ -97,23 +96,24 @@ const startGame = () => {
         timer: 0,
       });
 
-      // Start waiting phase (8s)
-      timer = 8;
-      timerInterval = setInterval(() => {
-        broadcast({
-          type: "tick",
-          multiplier: currentMultiplier,
-          state: "WAITING",
-          timer,
-        });
-        timer--;
+      // 2️⃣ Wait 2 seconds before starting WAITING timer
+      setTimeout(() => {
+        timer = 8;
+        timerInterval = setInterval(() => {
+          broadcast({
+            type: "tick",
+            multiplier: currentMultiplier,
+            state: "WAITING",
+            timer,
+          });
+          timer--;
 
-        // New game after countdown
-        if (timer < 0) {
-          clearInterval(timerInterval);
-          startGame();
-        }
-      }, 1000);
+          if (timer < 0) {
+            clearInterval(timerInterval);
+            startGame(); // start new game
+          }
+        }, 1000);
+      }, 2000);
     }
   }, 500);
 };

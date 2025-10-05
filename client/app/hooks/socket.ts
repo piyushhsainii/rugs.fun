@@ -14,7 +14,7 @@ export default function useGameWebSocket() {
   >([]);
   const [previousGames, setPreviousGames] = useState<any[]>([]);
   const [history, setHistory] = useState<number[]>([]);
-
+  const [timer, setTimer] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
   const historyRef = useRef<number[]>([]);
   const targetMultiplierRef = useRef<number>(1.0);
@@ -89,6 +89,9 @@ export default function useGameWebSocket() {
             setGameState("CRASHED");
           } else if (state === "WAITING") {
             setGameState("WAITING");
+            setTimer(data.timer);
+            setHistory([]);
+            historyRef.current = [];
           } else {
             setGameState("ACTIVE");
           }
@@ -133,9 +136,6 @@ export default function useGameWebSocket() {
     };
   }, [userId]);
 
-  // --------------------------------------------------
-  // Return public API for the component
-  // --------------------------------------------------
   return {
     gameState,
     history,
@@ -145,6 +145,7 @@ export default function useGameWebSocket() {
     wsRef,
     historyRef,
     targetMultiplierRef,
+    timer,
     setGameState,
   };
 }

@@ -15,7 +15,6 @@ interface Trade {
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const [Countdown, setCountdown] = useState(0);
   const [trades, setTrades] = useState<Trade[]>([]);
   // constants
   const CANDLE_WIDTH = 30;
@@ -33,11 +32,22 @@ export default function Home() {
     gameState,
     history,
     previousGames,
+    timer,
     historyRef,
     setGameState,
     targetMultiplierRef,
     clientsConnected,
   } = useGameWebSocket();
+
+  // store gameState in a ref that updates each render
+  const gameStateRef = useRef(gameState);
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+  const timerRef = useRef(timer);
+  useEffect(() => {
+    timerRef.current = timer;
+  }, [timer]);
 
   const restartGame = () => {
     wsRef.current?.close();
@@ -93,7 +103,7 @@ export default function Home() {
 
   // Main draw function — contains candles + fluid curve + dotted label
   const drawChart = useCallback(() => {
-    console.log("draw");
+    // console.log("draw");
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -111,10 +121,91 @@ export default function Home() {
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "#1a1d29";
     ctx.fillRect(0, 0, width, height);
+    const currentGameState = gameStateRef.current;
+    console.log("currentGameState inside draw:", currentGameState);
 
+    if (currentGameState === "CRASHED") {
+      ctx.save();
+
+      // 1️⃣ Draw red gradient overlay first
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, "rgba(255, 0, 0, 0.06)");
+      gradient.addColorStop(0.5, "rgba(255, 0, 0, 0.1)");
+      gradient.addColorStop(1, "rgba(255, 0, 0, 0.18)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(LEFT_PADDING, 0, width - LEFT_PADDING, height);
+
+      // 2️⃣ Then draw bright, glowing "RUGGED!"
+      const pulse = 0.05 * Math.sin(Date.now() / 120) + 1; // subtle pulse
+      ctx.globalAlpha = 1;
+      ctx.font = `900 ${Math.floor(height * 0.14)}px Inter`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // Outer glow shadow
+      ctx.shadowColor = "rgba(255, 30, 30, 0.8)";
+      ctx.shadowBlur = 25 * pulse;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+
+      // Core text color — bright red
+      ctx.fillStyle = "rgb(255, 30, 30)";
+      ctx.fillText("RUGGED!", width / 2, height / 2);
+
+      ctx.restore();
+    }
+
+    // If waiting (post-crash), render the big centered countdown and return early
+    if (currentGameState === "WAITING") {
+      // draw faint grid behind timer for context
+      ctx.strokeStyle = "#2a2d3a";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 5; i++) {
+        const y = (height / 5) * i;
+        ctx.beginPath();
+        ctx.moveTo(LEFT_PADDING, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      // center big countdown like multiplier
+      const label = timerRef.current != null ? `${timerRef.current}s` : "";
+      ctx.save();
+
+      // subtle pulsing using time
+      const pulse = 0.08 * Math.sin(Date.now() / 200) + 0.92;
+
+      ctx.globalAlpha = 1;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // big number
+      ctx.font = `bold ${Math.floor(height * 0.12)}px Inter`;
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = 12;
+      ctx.translate(width / 2, height / 2);
+      ctx.scale(pulse, pulse);
+      ctx.fillText(String(label), 0, 0);
+
+      // subtitle below
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+      ctx.font = "600 18px Inter";
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        "Starting soon",
+        width / 2,
+        height / 2 + Math.floor(height * 0.12) / 1.6
+      );
+      ctx.restore();
+
+      return;
+    }
+    // continue drawing chart when not WAITING
     const data = historyRef.current;
+    // if no data, draw grid and return (no candles)
     if (!data.length) {
-      // still draw grid when empty
       ctx.strokeStyle = "#2a2d3a";
       ctx.fillStyle = "#9ca3af";
       ctx.font = "14px Inter";
@@ -144,10 +235,10 @@ export default function Home() {
 
     const minMultiplier = animatedMinRef.current;
     const maxMultiplier = animatedMaxRef.current;
+    const denom = maxMultiplier - minMultiplier || 1e-6;
 
     const scaleY = (val: number) =>
-      height -
-      ((val - minMultiplier) / (maxMultiplier - minMultiplier)) * height;
+      height - ((val - minMultiplier) / denom) * height;
 
     // Grid + Y labels
     ctx.strokeStyle = "#2a2d3a";
@@ -168,7 +259,6 @@ export default function Home() {
     // Prepare visible candles. Determine an appropriate start value for "open" of first visible candle.
     const visibleData = data.slice(-MAX_VISIBLE_CANDLES);
     const startIndex = Math.max(0, data.length - visibleData.length);
-    // previous point (the value just before the first visible data point) if available
     const prevBeforeVisible =
       startIndex - 1 >= 0 ? data[startIndex - 1] : visibleData[0];
     let lastValue = prevBeforeVisible;
@@ -225,7 +315,6 @@ export default function Home() {
     // animate body growth for forming candle: interpolate between prev close and current
     const prevCloseY = scaleY(formingOpen);
     const targetCloseY = scaleY(formingClose);
-    // animate a bit based on difference
     const animY = prevCloseY + (targetCloseY - prevCloseY) * 0.22;
     const bodyTopForm = Math.min(prevCloseY, animY);
     const bodyHForm = Math.max(Math.abs(animY - prevCloseY), 2);
@@ -234,7 +323,6 @@ export default function Home() {
     drawRoundedRect(ctx, formingX, bodyTopForm, CANDLE_WIDTH - 2, bodyHForm, 4);
 
     // --- Fluid curve over points (Bezier) ---
-    // Build list of points (centers) including forming current
     const centersX: number[] = [];
     const centersY: number[] = [];
     for (let i = 0; i < visibleData.length; i++) {
@@ -242,7 +330,6 @@ export default function Home() {
       centersX.push(cx);
       centersY.push(scaleY(visibleData[i]));
     }
-    // add forming point
     const formingCenterX =
       LEFT_PADDING +
       visibleData.length * (CANDLE_WIDTH + GAP) +
@@ -259,7 +346,6 @@ export default function Home() {
         const currX = centersX[i];
         const currY = centersY[i];
         const cpX = (prevX + currX) / 2;
-        // Smooth cubic-like using two control points that's symmetrical
         ctx.bezierCurveTo(cpX, prevY, cpX, currY, currX, currY);
       }
       ctx.strokeStyle = "rgba(255,255,255,0.18)";
@@ -284,7 +370,6 @@ export default function Home() {
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
 
-    // compute estX next to forming candle
     const estX = Math.min(
       LEFT_PADDING +
         visibleData.length * (CANDLE_WIDTH + GAP) +
@@ -293,14 +378,16 @@ export default function Home() {
       width - 12 - ctx.measureText(label).width
     );
 
-    // background box
     const textWidth = ctx.measureText(label).width;
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(estX - 8, yCurrent - 16, textWidth + 16, 32);
 
     ctx.fillStyle = "#ffffff";
     ctx.fillText(label, estX, yCurrent);
-  }, []);
+  }, [gameState]);
+
+  console.log(gameState);
+
   const animationStarted = useRef(false);
 
   useEffect(() => {
