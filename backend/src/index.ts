@@ -2,12 +2,13 @@ import WebSocket, { WebSocketServer } from "ws";
 import { createTickGenerator } from "./lib/price_ticks";
 import { supabase } from "./lib/supabase";
 import { v4 as uuidv4 } from "uuid";
-
+import dotenv from "dotenv";
 interface Trade {
   id: number;
   buy: number;
   sell?: number;
   pnl?: number;
+  userId: string;
 }
 
 interface User {
@@ -48,6 +49,9 @@ const broadcast = (data: any) => {
     }
   });
 };
+
+// dotenv
+dotenv.config();
 
 // --- Start Game ---
 const startGame = () => {
@@ -108,6 +112,26 @@ const startGame = () => {
           if (res.error) {
             console.error("ERROR INSERTING GAME");
           }
+          const tradesWithGameId = userTrades.map((trade) => ({
+            amount: trade.buy,
+            game_id: gameId,
+            payout_multiplier: trade.sell ?? 0,
+            profit_loss:
+              trade.sell === undefined || !trade.sell
+                ? 0
+                : trade.buy - trade.sell,
+            user_id: trade.userId,
+          }));
+          // Adding Bulk Entries to Off Chain Ledger Post Crash,
+          supabase
+            .from("trades_rugs_fun")
+            .insert(tradesWithGameId)
+            .then((res) => {
+              if (res.error) {
+                console.log(res.error);
+                console.error("ERROR INSERTING TRADES");
+              }
+            });
         });
 
       // Broadcast crash
@@ -205,7 +229,11 @@ wss.on("connection", (ws) => {
           users.push(user);
         }
 
-        const trade: Trade = { id: Date.now(), buy: data.buy };
+        const trade: Trade = {
+          id: Date.now(),
+          buy: data.buy,
+          userId: user.userId,
+        };
         user.trades.push(trade);
         // global trades array
         userTrades.push(trade);
