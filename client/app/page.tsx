@@ -4,6 +4,9 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Leaderboard from "./components/leaderboard";
 import useGameWebSocket from "./hooks/socket";
+import { Button } from "@/components/ui/button";
+import BetStopLossControl from "./components/control-panel";
+import SummaryPrevGames from "./components/summary-data";
 
 interface Trade {
   id: number;
@@ -14,7 +17,6 @@ interface Trade {
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
   // constants
   const CANDLE_WIDTH = 30;
@@ -30,13 +32,14 @@ export default function Home() {
   const {
     allUserTrades,
     gameState,
-    history,
     previousGames,
     timer,
     historyRef,
     setGameState,
     targetMultiplierRef,
+    userId,
     clientsConnected,
+    wsRef,
   } = useGameWebSocket();
 
   // store gameState in a ref that updates each render
@@ -49,19 +52,8 @@ export default function Home() {
     timerRef.current = timer;
   }, [timer]);
 
-  const restartGame = () => {
-    wsRef.current?.close();
-    historyRef.current = [];
-    setTrades([]);
-    animatedMultiplierRef.current = 1.0;
-    animatedMinRef.current = 0.2;
-    animatedMaxRef.current = 2.0;
-    setGameState("WAITING");
-    // reconnect shortly
-    // setTimeout(() => connectWS(), 500);
-  };
-
   const handleBuy = () => {
+    console.log(`Coming in buy`);
     const userId = wallet.publicKey;
 
     const buyPrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
@@ -122,7 +114,6 @@ export default function Home() {
     ctx.fillStyle = "#1a1d29";
     ctx.fillRect(0, 0, width, height);
     const currentGameState = gameStateRef.current;
-    console.log("currentGameState inside draw:", currentGameState);
 
     if (currentGameState === "CRASHED") {
       ctx.save();
@@ -386,8 +377,6 @@ export default function Home() {
     ctx.fillText(label, estX, yCurrent);
   }, [gameState]);
 
-  console.log(gameState);
-
   const animationStarted = useRef(false);
 
   useEffect(() => {
@@ -406,11 +395,12 @@ export default function Home() {
 
   if (wallet && wallet.publicKey) {
     localStorage.setItem("userId", wallet.publicKey.toBase58());
+  } else {
+    localStorage.setItem("userId", "guest");
   }
-
   return (
     <div className="min-h-screen bg-[#1a1d29] flex items-start justify-center p-6">
-      <div className="w-full max-w-7xl flex gap-6">
+      <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-6">
         {/* Left: Chart */}
         <div className="flex-1">
           <div className="mb-4 flex justify-between items-center">
@@ -434,15 +424,7 @@ export default function Home() {
           </div>
 
           <div className="text-center mt-4">
-            <div
-              className={`text-6xl font-bold ${
-                targetMultiplierRef.current >= 1
-                  ? "text-green-500"
-                  : "text-red-500"
-              }`}
-            >
-              {targetMultiplierRef.current.toFixed(3)}x
-            </div>
+            {/* <BetStopLossControl /> */}
             <div className="text-white mt-2">
               {gameState === "ACTIVE" && "Round in Progress..."}
               {gameState === "CRASHED" && "Crashed!"}
@@ -451,35 +433,81 @@ export default function Home() {
           </div>
 
           <div className="mt-4 flex gap-4 justify-center">
-            <button
-              onClick={restartGame}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-bold"
-            >
-              Restart
-            </button>
-            <button
+            <Button
               onClick={handleBuy}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold"
+              disabled={
+                userId == "guest" ||
+                gameStateRef.current == "CRASHED" ||
+                gameStateRef.current == "WAITING"
+                  ? true
+                  : false
+              }
+              className={`bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold cursor-pointer`}
             >
               BUY
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleSell}
-              className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold"
+              disabled={
+                userId == "guest" ||
+                gameStateRef.current == "CRASHED" ||
+                gameStateRef.current == "WAITING"
+                  ? true
+                  : false
+              }
+              className={`bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold cursor-pointer`}
             >
               SELL
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Right: Leaderboard */}
-        <main className="p-6 md:p-10">
-          <div className="max-w-5xl mx-auto">
+        <main className="p-6 md:p-10 flex flex-col">
+          <div className="max-w-[300px] overflow-hidden">
+            <SummaryPrevGames
+              games={[
+                {
+                  crashedAt: 1,
+                  ticks: [{ value: 1.2 }],
+                },
+                {
+                  crashedAt: 1,
+                  ticks: [{ value: 1.2 }],
+                },
+                {
+                  crashedAt: 1,
+                  ticks: [{ value: 1.2 }],
+                },
+                {
+                  crashedAt: 1,
+                  ticks: [{ value: 1.2 }],
+                },
+                {
+                  crashedAt: 1,
+                  ticks: [{ value: 1.2 }],
+                },
+                {
+                  crashedAt: 1,
+                  ticks: [{ value: 1.2 }],
+                },
+                {
+                  crashedAt: 1,
+                  ticks: [{ value: 1.2 }],
+                },
+                {
+                  crashedAt: 1,
+                  ticks: [{ value: 1.2 }],
+                },
+              ]}
+            />
+          </div>
+          <div className=" mx-auto">
             <header className="mb-6">
-              <h1 className="text-2xl font-semibold text-foreground text-pretty">
+              <h1 className="text-2xl font-semibold text-white text-pretty">
                 Leaderboard
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm  text-white ">
                 Recent trades across top participants
               </p>
             </header>

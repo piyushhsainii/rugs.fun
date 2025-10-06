@@ -1,5 +1,7 @@
 import WebSocket, { WebSocketServer } from "ws";
 import { createTickGenerator } from "./lib/price_ticks";
+import { supabase } from "./lib/supabase";
+import { v4 as uuidv4 } from "uuid";
 
 interface Trade {
   id: number;
@@ -36,6 +38,7 @@ let timerInterval: any;
 let users: User[] = [];
 let currentGameTicks: GameTick[] = [];
 let previousGames: GameHistory[] = []; // holds last 10 games only
+let userTrades: Trade[] = [];
 
 // --- Broadcast Helper ---
 const broadcast = (data: any) => {
@@ -61,13 +64,14 @@ const startGame = () => {
     currentMultiplier = tick.value;
     // Record tick
     currentGameTicks.push({ time: Date.now(), value: currentMultiplier });
-
+    const gameId = uuidv4();
     // Broadcast live tick
     broadcast({
       type: "tick",
       multiplier: currentMultiplier,
       state: gameState,
       timer: 0,
+      gameId: gameId,
     });
 
     // --- Crash ---
@@ -80,20 +84,42 @@ const startGame = () => {
       previousGames.push({
         id: Date.now(),
         crashedAt: currentMultiplier,
-        ticks: [...currentGameTicks],
+        ticks: currentGameTicks,
       });
 
       // Keep only last 10 games
       if (previousGames.length > 10) {
         previousGames.shift();
       }
+      const total_volume = currentGameTicks
+        .map((data) => data.value) // get array of values
+        .reduce((acc, val) => acc + val, 0); // sum them
       currentGameTicks = [];
+
+      // Update off chain ledger securely
+      supabase
+        .from("games_rugs_fun")
+        .insert({
+          game_id: gameId,
+          crash_multiplier: currentMultiplier,
+          total_volume: total_volume,
+        })
+        .then((res) => {
+          if (res.error) {
+            console.error("ERROR INSERTING GAME");
+          }
+        });
+
       // Broadcast crash
       broadcast({
         type: "tick",
         multiplier: currentMultiplier,
         state: "CRASHED",
         timer: 0,
+      });
+      broadcast({
+        type: "prev-game",
+        data: previousGames,
       });
 
       // 2️⃣ Wait 2 seconds before starting WAITING timer
@@ -156,7 +182,6 @@ wss.on("connection", (ws) => {
             })
           );
         }
-
         // Send current tick data for chart redraw
         ws.send(
           JSON.stringify({
@@ -164,7 +189,12 @@ wss.on("connection", (ws) => {
             ticks: currentGameTicks,
           })
         );
-
+        ws.send(
+          JSON.stringify({
+            type: "prev-game",
+            data: previousGames,
+          })
+        );
         return;
       }
       // --- BUY ---
@@ -177,7 +207,8 @@ wss.on("connection", (ws) => {
 
         const trade: Trade = { id: Date.now(), buy: data.buy };
         user.trades.push(trade);
-
+        // global trades array
+        userTrades.push(trade);
         broadcast({
           type: "trade-update",
           userId: user.userId,
@@ -190,10 +221,17 @@ wss.on("connection", (ws) => {
         if (!user) return;
 
         const openTrade = user.trades.find((t) => t.sell === undefined);
+        const openGlobalTrade = userTrades.find((t) => t.sell === undefined);
         if (!openTrade) return;
+        if (!openGlobalTrade) return;
 
         openTrade.sell = data.sell;
         openTrade.pnl = ((data.sell - openTrade.buy) / openTrade.buy) * 100;
+
+        // Updating the state of global
+        openTrade.sell = data.sell;
+        openGlobalTrade.pnl =
+          ((data.sell - openGlobalTrade.buy) / openGlobalTrade.buy) * 100;
 
         broadcast({
           type: "trade-update",

@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 export default function useGameWebSocket() {
-  const { publicKey } = useWallet();
-  const userId = publicKey?.toBase58();
+  const userId = localStorage.getItem("userId");
 
   const [gameState, setGameState] = useState<"WAITING" | "ACTIVE" | "CRASHED">(
     "WAITING"
@@ -91,6 +90,7 @@ export default function useGameWebSocket() {
             setGameState("WAITING");
             setTimer(data.timer);
             setHistory([]);
+            setAllUserTrades([]);
             historyRef.current = [];
           } else {
             setGameState("ACTIVE");
@@ -146,6 +146,7 @@ export default function useGameWebSocket() {
     historyRef,
     targetMultiplierRef,
     timer,
+    userId,
     setGameState,
   };
 }
