@@ -7,9 +7,8 @@ use anchor_lang::prelude::*;
 
 pub use constants::*;
 pub use instructions::*;
-pub use state::*;
 
-declare_id!("AAd85DCUFZpLB2JxUTqkBWHyfNfAyzq3HTSuqeBnAxjw");
+declare_id!("NTNeSNVwutnfpaDJ7TYWBeCZuFMd8NhEFvxceQVgbpZ");
 
 #[program]
 pub mod rugs_fun {

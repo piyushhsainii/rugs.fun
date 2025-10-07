@@ -28,7 +28,7 @@ pub fn process_deposit(ctx: Context<Deposit>, amount:u64) -> Result<()> {
     
     let cpi_context = CpiContext::new(
         ctx.accounts.token_program.to_account_info(),
-        TransferChecked{
+        TransferChecked {
             authority:ctx.accounts.signer.to_account_info(),
             from:ctx.accounts.signer.to_account_info(),
             to:ctx.accounts.bank_account.to_account_info(),

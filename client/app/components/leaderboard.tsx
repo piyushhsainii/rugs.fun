@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ChartBarIncreasingIcon } from "lucide-react";
 
 type Trade = {
   id: string | number;
@@ -71,7 +72,7 @@ export function Leaderboard({
   return (
     <Card
       className={cn(
-        "bg-[#0f0f10] border border-gray-700 rounded-xl shadow-sm w-auto lg:w-[350px] text-white",
+        "bg-[#0f0f10] border border-yellow-400/40 rounded-xl shadow-sm w-auto lg:w-[350px] text-white",
         "transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-gray-700/40",
         className
       )}
@@ -83,16 +84,9 @@ export function Leaderboard({
         )}
       >
         <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "h-8 w-8 rounded-md bg-gray-800 flex items-center justify-center text-sm font-medium text-gray-200"
-            )}
-            aria-hidden
-          >
-            {"LB"}
-          </div>
+          <ChartBarIncreasingIcon color="yellow" />
           <div className="flex flex-col">
-            <h2 className="text-base font-semibold text-white text-pretty">
+            <h2 className="text-base font-semibold text-white text-pretty brightness-75">
               {title}
             </h2>
             <p className="text-xs text-gray-400">

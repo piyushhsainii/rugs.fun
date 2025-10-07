@@ -4,15 +4,15 @@
 resolution = true
 skip-lint = false
 
-[programs.localnet]
-rugs_fun = "AAd85DCUFZpLB2JxUTqkBWHyfNfAyzq3HTSuqeBnAxjw"
+[programs.devnet]
+rugs_fun = "NTNeSNVwutnfpaDJ7TYWBeCZuFMd8NhEFvxceQVgbpZ"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
-wallet = '~\.config/solana/id.json'
+cluster = "devnet"
+wallet = "./my-keypair.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

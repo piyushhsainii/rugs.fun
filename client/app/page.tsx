@@ -6,6 +6,17 @@ import Leaderboard from "./components/leaderboard";
 import useGameWebSocket from "./hooks/socket";
 import { Button } from "@/components/ui/button";
 import SummaryPrevGames from "./components/summary-data";
+import {
+  clusterApiUrl,
+  Connection,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+} from "@solana/web3.js";
+import {
+  getAssociatedTokenAddress,
+  TOKEN_2022_PROGRAM_ID,
+} from "@solana/spl-token";
+import { MINT_ADDRESS } from "@/constants/constants";
 
 interface Trade {
   id: number;
@@ -17,6 +28,7 @@ interface Trade {
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [balance, setbalance] = useState(0);
   // constants
   const CANDLE_WIDTH = 30;
   const GAP = 6;
@@ -402,6 +414,33 @@ export default function Home() {
     localStorage.setItem("userId", "guest");
   }
 
+  useEffect(() => {
+    if (!wallet.publicKey) return;
+    const fetchBalance = async () => {
+      if (!wallet.publicKey) return;
+      try {
+        const connection = new Connection(clusterApiUrl("devnet"));
+
+        const getAddress = await getAssociatedTokenAddress(
+          new PublicKey(MINT_ADDRESS),
+          wallet.publicKey,
+          false,
+          TOKEN_2022_PROGRAM_ID
+        );
+        console.log(getAddress.toString());
+        const balance = await connection.getTokenAccountBalance(getAddress);
+        const formattedBalance = Number(
+          Number(balance.value.amount) / LAMPORTS_PER_SOL
+        ).toFixed(4);
+        setbalance(Number(formattedBalance));
+        console.log(`user balance`, balance);
+      } catch (error) {
+        console.log(`error while fetching balance`, error);
+      }
+    };
+    fetchBalance();
+  }, [wallet.publicKey]);
+
   console.log(`GAMES DATA`, previousGames);
 
   return (
@@ -411,8 +450,9 @@ export default function Home() {
         <div className="flex-1">
           <div className="mb-4 flex justify-between items-center">
             <h1 className="text-white text-2xl font-bold">Rug.fun (clone)</h1>
-            <div className="text-white">
-              Balance: <span className="text-yellow-400">98.138</span>
+            <div className=" bg-yellow-400 px-3 py-1 rounded-lg text-black font-bold font-mono">
+              Balance:
+              <span className="text-black font-bold font-mono">{balance}</span>
             </div>
           </div>
           <div className="text-white flex items-center my-1">
@@ -437,7 +477,7 @@ export default function Home() {
               {gameState === "WAITING" && "Starting soon..."}
             </div>
           </div>
-
+          {/* Pay Button */}
           <div className="mt-4 flex gap-4 justify-center">
             <Button
               onClick={handleBuy}
@@ -448,7 +488,11 @@ export default function Home() {
                   ? true
                   : false
               }
-              className={`bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold cursor-pointer`}
+              className={`bg-green-600 hover:bg-green-700 h-10 w-32 shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
+              style={{
+                textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
+                boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
+              }}
             >
               BUY
             </Button>
@@ -461,7 +505,11 @@ export default function Home() {
                   ? true
                   : false
               }
-              className={`bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold cursor-pointer`}
+              className={`bg-red-600 hover:bg-red-700 h-10 w-32 shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
+              style={{
+                textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
+                boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
+              }}
             >
               SELL
             </Button>
@@ -472,10 +520,10 @@ export default function Home() {
         <main className="p-6 md:p-10 flex flex-col">
           <div className=" mx-auto">
             <header className="mb-6">
-              <h1 className="text-2xl font-semibold text-white text-pretty">
+              <h1 className="text-2xl font-semibold text-yellow-500 text-pretty font-mono">
                 Leaderboard
               </h1>
-              <p className="text-sm  text-white ">
+              <p className="text-sm  font-mono text-yellow-600">
                 Recent trades across top participants
               </p>
             </header>

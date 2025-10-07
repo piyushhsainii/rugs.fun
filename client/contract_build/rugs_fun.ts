@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/rugs_fun.json`.
  */
 export type RugsFun = {
-  "address": "AAd85DCUFZpLB2JxUTqkBWHyfNfAyzq3HTSuqeBnAxjw",
+  "address": "NTNeSNVwutnfpaDJ7TYWBeCZuFMd8NhEFvxceQVgbpZ",
   "metadata": {
     "name": "rugsFun",
     "version": "0.1.0",
