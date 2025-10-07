@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Leaderboard from "./components/leaderboard";
 import useGameWebSocket from "./hooks/socket";
 import { Button } from "@/components/ui/button";
-import BetStopLossControl from "./components/control-panel";
 import SummaryPrevGames from "./components/summary-data";
 
 interface Trade {
@@ -51,6 +50,10 @@ export default function Home() {
   useEffect(() => {
     timerRef.current = timer;
   }, [timer]);
+  const prevGameRef = useRef(previousGames);
+  useEffect(() => {
+    prevGameRef.current = previousGames;
+  }, [previousGames]);
 
   const handleBuy = () => {
     console.log(`Coming in buy`);
@@ -398,6 +401,9 @@ export default function Home() {
   } else {
     localStorage.setItem("userId", "guest");
   }
+
+  console.log(`GAMES DATA`, previousGames);
+
   return (
     <div className="min-h-screen bg-[#1a1d29] flex items-start justify-center p-6">
       <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-6">
@@ -464,44 +470,6 @@ export default function Home() {
 
         {/* Right: Leaderboard */}
         <main className="p-6 md:p-10 flex flex-col">
-          <div className="max-w-[300px] overflow-hidden">
-            <SummaryPrevGames
-              games={[
-                {
-                  crashedAt: 1,
-                  ticks: [{ value: 1.2 }],
-                },
-                {
-                  crashedAt: 1,
-                  ticks: [{ value: 1.2 }],
-                },
-                {
-                  crashedAt: 1,
-                  ticks: [{ value: 1.2 }],
-                },
-                {
-                  crashedAt: 1,
-                  ticks: [{ value: 1.2 }],
-                },
-                {
-                  crashedAt: 1,
-                  ticks: [{ value: 1.2 }],
-                },
-                {
-                  crashedAt: 1,
-                  ticks: [{ value: 1.2 }],
-                },
-                {
-                  crashedAt: 1,
-                  ticks: [{ value: 1.2 }],
-                },
-                {
-                  crashedAt: 1,
-                  ticks: [{ value: 1.2 }],
-                },
-              ]}
-            />
-          </div>
           <div className=" mx-auto">
             <header className="mb-6">
               <h1 className="text-2xl font-semibold text-white text-pretty">
@@ -513,6 +481,12 @@ export default function Home() {
             </header>
             <Leaderboard data={allUserTrades} />
           </div>
+          {prevGameRef && previousGames.length > 0 && (
+            <div className="max-w-[300px] flex flex-col overflow-hidden">
+              {/* @ts-ignore */}
+              <SummaryPrevGames gameData={previousGames} />
+            </div>
+          )}
         </main>
       </div>
     </div>
