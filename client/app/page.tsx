@@ -17,6 +17,9 @@ import {
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import { MINT_ADDRESS } from "@/constants/constants";
+import { supabase } from "@/supabase/client";
+import { useUserInformation } from "./hooks/userInfo";
+import BetStopLossControl from "./components/control-panel";
 
 interface Trade {
   id: number;
@@ -28,7 +31,6 @@ interface Trade {
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [balance, setbalance] = useState(0);
   // constants
   const CANDLE_WIDTH = 30;
   const GAP = 6;
@@ -53,6 +55,8 @@ export default function Home() {
     wsRef,
   } = useGameWebSocket();
 
+  const { balance, setBalance, error, loading, refetch } = useUserInformation();
+
   // store gameState in a ref that updates each render
   const gameStateRef = useRef(gameState);
   useEffect(() => {
@@ -70,7 +74,7 @@ export default function Home() {
   const handleBuy = () => {
     console.log(`Coming in buy`);
     const userId = wallet.publicKey;
-
+    // if(balance)
     const buyPrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
     wsRef.current?.send(JSON.stringify({ type: "buy", userId, buy: buyPrice }));
   };
@@ -414,48 +418,21 @@ export default function Home() {
     localStorage.setItem("userId", "guest");
   }
 
-  useEffect(() => {
-    if (!wallet.publicKey) return;
-    const fetchBalance = async () => {
-      if (!wallet.publicKey) return;
-      try {
-        const connection = new Connection(clusterApiUrl("devnet"));
-
-        const getAddress = await getAssociatedTokenAddress(
-          new PublicKey(MINT_ADDRESS),
-          wallet.publicKey,
-          false,
-          TOKEN_2022_PROGRAM_ID
-        );
-        console.log(getAddress.toString());
-        const balance = await connection.getTokenAccountBalance(getAddress);
-        const formattedBalance = Number(
-          Number(balance.value.amount) / LAMPORTS_PER_SOL
-        ).toFixed(4);
-        setbalance(Number(formattedBalance));
-        console.log(`user balance`, balance);
-      } catch (error) {
-        console.log(`error while fetching balance`, error);
-      }
-    };
-    fetchBalance();
-  }, [wallet.publicKey]);
-
-  console.log(`GAMES DATA`, previousGames);
-
   return (
-    <div className="min-h-screen bg-[#1a1d29] flex items-start justify-center p-6">
-      <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-6">
+    <div className="min-h-screen bg-[#1a1d29] flex flex-col items-start  p-2 w-full">
+      <div className="w-full max-w-[1500px] flex flex-col justify-end mx-auto lg:flex-row gap-2">
         {/* Left: Chart */}
         <div className="flex-1">
           <div className="mb-4 flex justify-between items-center">
             <h1 className="text-white text-2xl font-bold">Rug.fun (clone)</h1>
             <div className=" bg-yellow-400 px-3 py-1 rounded-lg text-black font-bold font-mono">
               Balance:
-              <span className="text-black font-bold font-mono">{balance}</span>
+              <span className="text-black font-bold font-mono">
+                {balance && (balance / 1000000000).toFixed(4)}
+              </span>
             </div>
           </div>
-          <div className="text-white flex items-center my-1">
+          <div className="text-white flex items-center my-1 w-full">
             {" "}
             <span className="inline-block w-2 h-2 bg-green-600 rounded-full m-1"></span>
             <Label htmlFor="">{clientsConnected} users online</Label>
@@ -463,56 +440,10 @@ export default function Home() {
           <div className="bg-[#0f1118] rounded-lg p-4 relative">
             <canvas
               ref={canvasRef}
-              width={1000}
+              width={1300}
               height={600}
-              className="w-full h-auto rounded-lg"
+              className="w-full"
             />
-          </div>
-
-          <div className="text-center mt-4">
-            {/* <BetStopLossControl /> */}
-            <div className="text-white mt-2">
-              {gameState === "ACTIVE" && "Round in Progress..."}
-              {gameState === "CRASHED" && "Crashed!"}
-              {gameState === "WAITING" && "Starting soon..."}
-            </div>
-          </div>
-          {/* Pay Button */}
-          <div className="mt-4 flex gap-4 justify-center">
-            <Button
-              onClick={handleBuy}
-              disabled={
-                userId == "guest" ||
-                gameStateRef.current == "CRASHED" ||
-                gameStateRef.current == "WAITING"
-                  ? true
-                  : false
-              }
-              className={`bg-green-600 hover:bg-green-700 h-10 w-32 shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
-              style={{
-                textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
-                boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
-              }}
-            >
-              BUY
-            </Button>
-            <Button
-              onClick={handleSell}
-              disabled={
-                userId == "guest" ||
-                gameStateRef.current == "CRASHED" ||
-                gameStateRef.current == "WAITING"
-                  ? true
-                  : false
-              }
-              className={`bg-red-600 hover:bg-red-700 h-10 w-32 shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
-              style={{
-                textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
-                boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
-              }}
-            >
-              SELL
-            </Button>
           </div>
         </div>
 
@@ -537,6 +468,56 @@ export default function Home() {
           )}
         </main>
       </div>
+      <section className="flex flex-col items-start justify-start max-w-[2400px] mx-auto pr-64">
+        <div className="text-center mt-4">
+          {/* <BetStopLossControl /> */}
+          <div className="text-white mt-2">
+            {gameState === "ACTIVE" && "Round in Progress..."}
+            {gameState === "CRASHED" && "Crashed!"}
+            {gameState === "WAITING" && "Starting soon..."}
+          </div>
+        </div>
+
+        <BetStopLossControl />
+
+        {/* Pay Button */}
+        <div className="mt-4 flex gap-4 justify-center">
+          <Button
+            onClick={handleBuy}
+            disabled={
+              userId == "guest" ||
+              gameStateRef.current == "CRASHED" ||
+              gameStateRef.current == "WAITING"
+                ? true
+                : false
+            }
+            className={`bg-green-600 hover:bg-green-700 h-10 w-32 shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
+            style={{
+              textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
+              boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
+            }}
+          >
+            BUY
+          </Button>
+          <Button
+            onClick={handleSell}
+            disabled={
+              userId == "guest" ||
+              gameStateRef.current == "CRASHED" ||
+              gameStateRef.current == "WAITING"
+                ? true
+                : false
+            }
+            className={`bg-red-600 hover:bg-red-700 h-10 w-32 shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
+            style={{
+              textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
+              boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
+            }}
+          >
+            SELL
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

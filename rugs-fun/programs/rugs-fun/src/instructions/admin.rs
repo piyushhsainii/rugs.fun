@@ -11,7 +11,8 @@ pub struct Admin<'info> {
        payer=signer,
        seeds=[b"bank_authority"],
        space=8 + 8 ,
-       bump
+       bump,
+       owner= System::id()
     )]
     pub bank_authority:UncheckedAccount<'info>,
     #[account(

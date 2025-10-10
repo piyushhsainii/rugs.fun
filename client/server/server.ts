@@ -74,3 +74,57 @@ export async function AirDropTokensToUser(
     return null;
   }
 }
+
+export async function updateBalance(
+  depositedAmount: number,
+  wallet_address: string
+) {
+  // fetch user balance
+  const supabase = await createClient();
+  const balance = await supabase
+    .from("users_rugsfun")
+    .select("*")
+    .eq("wallet_address", wallet_address)
+    .single();
+
+  if (!balance.data || balance.error) {
+    console.log(`Could not update balance`);
+    return;
+  }
+  console.log(`Deposited Amount`, depositedAmount);
+  // Updating user balance
+  const updatedBalance = (balance.data?.balance ?? 0) + depositedAmount;
+  const res = await supabase
+    .from("users_rugsfun")
+    .update({
+      balance: updatedBalance,
+      depositedBalance: updatedBalance,
+    })
+    .eq("wallet_address", wallet_address)
+    .single();
+
+  if (res.error) {
+    console.log(`Could not update balance`);
+    return;
+  }
+
+  return updatedBalance;
+}
+
+export async function MaxWithdrawAmountAllowed(wallet_address: string) {
+  // fetch user balance
+  const supabase = await createClient();
+  const { data: balance, error } = await supabase
+    .from("users_rugsfun")
+    .select("*")
+    .eq("wallet_address", wallet_address)
+    .single();
+
+  if (!balance || error) {
+    console.log(`Could not update balance`);
+    return;
+  }
+  console.log(`Max Withdraw Amount`, balance.balance);
+
+  return balance.balance;
+}

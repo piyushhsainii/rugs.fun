@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{token_2022::{transfer_checked, TransferChecked}, token_interface::{Mint, TokenAccount, TokenInterface}};
+use anchor_spl::{associated_token::AssociatedToken, token_2022::{transfer_checked, TransferChecked}, token_interface::{Mint, TokenAccount, TokenInterface}};
 
 
 #[derive(Accounts)]
@@ -10,32 +10,37 @@ pub struct Withdraw<'info> {
     #[account(
         mut,
         seeds=[b"bank_authority"],
-        bump
+        bump,
+        owner= System::id()
     )]
     pub bank_authority:SystemAccount<'info>,
     #[account(
         mut,
-        seeds=[b"bank_reserve"],
-        bump
+        associated_token::mint=mint,
+        associated_token::authority=bank_authority,
+        associated_token::token_program=token_program
     )]
     pub bank_account:InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint=mint,
-        associated_token::authority=signer
+        associated_token::authority=signer,
+        associated_token::token_program=token_program
     )]
     pub user_account:InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
     )]
     pub mint:InterfaceAccount<'info,Mint>,
-    pub token_program:Interface<'info,TokenInterface>
+    pub token_program:Interface<'info,TokenInterface>,
+    pub associated_token_program:Program<'info, AssociatedToken>
+
 
 }
 
 pub fn process_withdraw(ctx: Context<Withdraw>,amount:u64) -> Result<()> {
      
-    let signer_seeds:&[&[&[u8]]] = &[&[b"bank_reserve", &[ctx.bumps.bank_account]]];
+    let signer_seeds:&[&[&[u8]]] = &[&[b"bank_authority", &[ctx.bumps.bank_authority]]];
 
     let cpi_context = CpiContext::new_with_signer(
         ctx.accounts.token_program.to_account_info(),

@@ -6,12 +6,14 @@ import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { useUserInformation } from "../hooks/userInfo";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 type Numberish = number | string;
 
@@ -35,7 +37,6 @@ type BetStopLossProps = {
 export function BetStopLossControl({
   amount,
   onAmountChange,
-  balance = 100,
   min = 0,
   step = 0.001,
   amountPresets = ["+0.001", "+0.01", "+0.1", "+1", "1/2", "x2", "MAX"],
@@ -44,6 +45,8 @@ export function BetStopLossControl({
   percentPresets = [10, 25, 50, 100],
   className,
 }: BetStopLossProps) {
+  const { balance } = useUserInformation();
+
   // Controlled/uncontrolled pattern for amount
   const [internalAmount, setInternalAmount] = React.useState<number>(
     amount ?? 0
@@ -76,24 +79,47 @@ export function BetStopLossControl({
   };
 
   const applyPreset = (p: Numberish) => {
+    if (!balance) return;
     const s = String(p).toUpperCase();
     // "x" to clear
     if (s === "X") return setAmt(0);
-    if (s === "MAX") return setAmt(Math.max(min, balance));
-    if (s === "1/2" || s === "½") return setAmt(Math.max(min, balance / 2));
+    if (s === "MAX")
+      return setAmt(
+        Math.max(min, Number((balance / LAMPORTS_PER_SOL).toFixed(4)))
+      );
+    if (s === "1/2" || s === "½")
+      return setAmt(
+        Math.max(min, Number((balance / LAMPORTS_PER_SOL).toFixed(4)) / 2)
+      );
     if (s === "X2" || s === "2X")
-      return setAmt(Math.max(min, Math.min(amt * 2, balance)));
+      return setAmt(
+        Math.max(
+          min,
+          Math.min(amt * 2, Number((balance / LAMPORTS_PER_SOL).toFixed(4)))
+        )
+      );
 
     // relative increment like "+0.001" or "+1"
     if (s.startsWith("+")) {
       const inc = Number(s.slice(1));
       if (Number.isFinite(inc))
-        return setAmt(Math.max(min, Math.min(amt + inc, balance)));
+        return setAmt(
+          Math.max(
+            min,
+            Math.min(amt + inc, Number((balance / LAMPORTS_PER_SOL).toFixed(4)))
+          )
+        );
     }
 
     // absolute number as fallback
     const n = Number(s);
-    if (Number.isFinite(n)) return setAmt(Math.max(min, Math.min(n, balance)));
+    if (Number.isFinite(n))
+      return setAmt(
+        Math.max(
+          min,
+          Math.min(n, Number((balance / LAMPORTS_PER_SOL).toFixed(4)))
+        )
+      );
   };
 
   const applyPercentPreset = (p: number) => {
@@ -105,7 +131,7 @@ export function BetStopLossControl({
     <div
       className={cn(
         // Container follows theme tokens; subtle hover + focus ring
-        "bg-card border rounded-xl p-3 md:p-4 flex flex-col gap-3 transition-all",
+        "bg-primary text-white border border-white/15 rounded-xl p-3 md:p-4 flex flex-col gap-3 transition-all",
         "hover:shadow-sm hover:border-primary/40 hover:ring-2 hover:ring-primary/10",
         "md:flex-row md:items-stretch md:gap-4",
         className
@@ -113,48 +139,59 @@ export function BetStopLossControl({
     >
       {/* Left: Amount input with presets */}
       <div className="md:flex-1">
-        <InputGroup className="h-12 md:h-14">
+        <InputGroup className="h-12 md:h-14 flex flex-wrap md:flex-nowrap">
           {/* Amount field */}
-          <InputGroupInput
-            inputMode="decimal"
-            type="number"
-            step={step}
-            min={min}
-            value={amt}
-            onChange={(e) => handleAmountInput(e.target.value)}
-            aria-label="Bet amount"
-            className={cn(
-              // Larger, legible numeric style
-              "font-mono text-lg md:text-2xl text-foreground px-4",
-              "placeholder:text-muted-foreground rounded-r-none"
-            )}
-            placeholder="0.00"
-          />
-          {/* Quick actions on the right of input */}
-          <InputGroupAddon align="inline-end" className="gap-1">
+          <div className="flex-1 min-w-[200px]">
+            <Input
+              inputMode="decimal"
+              type="number"
+              step={step}
+              min={min}
+              value={amt}
+              onChange={(e) => handleAmountInput(e.target.value)}
+              aria-label="Bet amount"
+              className={cn(
+                "w-full min-w-[200px] font-mono text-lg md:text-2xl text-white px-3 text-right",
+                "bg-white/10 border-white/20 focus-visible:ring-white/30",
+                "placeholder:text-white/60"
+              )}
+              placeholder="0.00"
+            />
+          </div>
+
+          {/* Quick actions on the right */}
+          <InputGroupAddon align="inline-end" className="flex gap-1.5 shrink-0">
             <InputGroupButton
               size="xs"
               variant="ghost"
               onClick={() => applyPreset("X")}
               aria-label="Clear"
+              className="text-white/80 hover:bg-white/10"
             >
-              {"×"}
+              ×
             </InputGroupButton>
+
             {amountPresets.map((p) => (
               <InputGroupButton
                 key={String(p)}
                 size="xs"
                 variant="outline"
-                className="transition-colors hover:bg-accent"
+                className={cn(
+                  "text-white/90 border-white/20 hover:bg-white/10"
+                )}
                 onClick={() => applyPreset(p)}
               >
                 {String(p)}
               </InputGroupButton>
             ))}
-            <InputGroupText className="ml-1">
-              <span className="text-muted-foreground">Bal</span>
-              <span className="font-mono text-foreground">
-                {formatAmt(balance)}
+
+            {/* Balance pill */}
+            <InputGroupText className="ml-1 flex items-center gap-1 bg-white/5 border border-white/10 rounded-md px-2 py-1">
+              <span className="text-gray-300">Bal</span>
+              <span className="font-mono text-white">
+                {formatAmt(
+                  balance ? Number((balance / LAMPORTS_PER_SOL).toFixed(4)) : 0
+                )}
               </span>
             </InputGroupText>
           </InputGroupAddon>
@@ -165,8 +202,8 @@ export function BetStopLossControl({
       <div className="md:flex-1">
         <div
           className={cn(
-            "border rounded-lg px-3 py-2 md:px-3.5 md:py-2.5",
-            "bg-background/40 dark:bg-background/20"
+            "border border-white/15 rounded-lg px-3 py-2 md:px-3.5 md:py-2.5",
+            "bg-white/5"
           )}
         >
           <div className="flex items-center gap-2 md:gap-2.5">
@@ -181,7 +218,9 @@ export function BetStopLossControl({
                     variant={active ? "destructive" : "outline"}
                     className={cn(
                       "h-8 px-2.5 transition-colors",
-                      active ? "text-white" : ""
+                      !active &&
+                        "text-white/90 border-white/20 hover:bg-white/10",
+                      active && "text-white"
                     )}
                     onClick={() => applyPercentPreset(p)}
                     aria-pressed={active}
@@ -203,16 +242,15 @@ export function BetStopLossControl({
                 className={cn(
                   "w-full",
                   "[&_[data-slot='slider-range']]:bg-destructive",
-                  // subtle hover animation for the thumb
                   "[&_[data-slot='slider-thumb']]:transition-transform [&_[data-slot='slider-thumb']]:hover:scale-105"
                 )}
               />
-              <div className="w-16 text-right font-mono tabular-nums text-foreground">
-                {stop} <span className="text-muted-foreground">%</span>
+              <div className="w-16 text-right font-mono tabular-nums text-white">
+                {stop} <span className="text-gray-300">%</span>
               </div>
             </div>
           </div>
-          <div className="mt-2 text-xs text-muted-foreground">
+          <div className="mt-2 text-xs text-gray-300">
             Auto-sell triggers when price drops by the selected percentage.
           </div>
         </div>

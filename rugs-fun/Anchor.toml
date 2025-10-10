@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-rugs_fun = "NTNeSNVwutnfpaDJ7TYWBeCZuFMd8NhEFvxceQVgbpZ"
+rugs_fun = "5gs6aaY9ELfjVHKa7s8swkjLdAZgfnYMsGhm862rmkgN"
 
 [registry]
 url = "https://api.apr.dev"

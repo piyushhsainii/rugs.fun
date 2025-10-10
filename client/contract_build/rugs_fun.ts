@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/rugs_fun.json`.
  */
 export type RugsFun = {
-  "address": "NTNeSNVwutnfpaDJ7TYWBeCZuFMd8NhEFvxceQVgbpZ",
+  "address": "5gs6aaY9ELfjVHKa7s8swkjLdAZgfnYMsGhm862rmkgN",
   "metadata": {
     "name": "rugsFun",
     "version": "0.1.0",
@@ -32,7 +32,7 @@ export type RugsFun = {
           "signer": true
         },
         {
-          "name": "bankAccount",
+          "name": "bankAuthority",
           "writable": true,
           "pda": {
             "seeds": [
@@ -44,16 +44,75 @@ export type RugsFun = {
                   110,
                   107,
                   95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
                   114,
-                  101,
-                  115,
-                  101,
-                  114,
-                  118,
-                  101
+                  105,
+                  116,
+                  121
                 ]
               }
             ]
+          }
+        },
+        {
+          "name": "bankAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "bankAuthority"
+              },
+              {
+                "kind": "account",
+                "path": "tokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
           }
         },
         {
@@ -66,41 +125,8 @@ export type RugsFun = {
                 "path": "signer"
               },
               {
-                "kind": "const",
-                "value": [
-                  6,
-                  221,
-                  246,
-                  225,
-                  215,
-                  101,
-                  161,
-                  147,
-                  217,
-                  203,
-                  225,
-                  70,
-                  206,
-                  235,
-                  121,
-                  172,
-                  28,
-                  180,
-                  133,
-                  237,
-                  95,
-                  91,
-                  55,
-                  145,
-                  58,
-                  140,
-                  245,
-                  133,
-                  126,
-                  255,
-                  0,
-                  169
-                ]
+                "kind": "account",
+                "path": "tokenProgram"
               },
               {
                 "kind": "account",
@@ -152,6 +178,10 @@ export type RugsFun = {
         },
         {
           "name": "tokenProgram"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         }
       ],
       "args": [
@@ -332,23 +362,55 @@ export type RugsFun = {
           "pda": {
             "seeds": [
               {
-                "kind": "const",
-                "value": [
-                  98,
-                  97,
-                  110,
-                  107,
-                  95,
-                  114,
-                  101,
-                  115,
-                  101,
-                  114,
-                  118,
-                  101
-                ]
+                "kind": "account",
+                "path": "bankAuthority"
+              },
+              {
+                "kind": "account",
+                "path": "tokenProgram"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
               }
-            ]
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
           }
         },
         {
@@ -361,41 +423,8 @@ export type RugsFun = {
                 "path": "signer"
               },
               {
-                "kind": "const",
-                "value": [
-                  6,
-                  221,
-                  246,
-                  225,
-                  215,
-                  101,
-                  161,
-                  147,
-                  217,
-                  203,
-                  225,
-                  70,
-                  206,
-                  235,
-                  121,
-                  172,
-                  28,
-                  180,
-                  133,
-                  237,
-                  95,
-                  91,
-                  55,
-                  145,
-                  58,
-                  140,
-                  245,
-                  133,
-                  126,
-                  255,
-                  0,
-                  169
-                ]
+                "kind": "account",
+                "path": "tokenProgram"
               },
               {
                 "kind": "account",
@@ -447,6 +476,10 @@ export type RugsFun = {
         },
         {
           "name": "tokenProgram"
+        },
+        {
+          "name": "associatedTokenProgram",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         }
       ],
       "args": [
