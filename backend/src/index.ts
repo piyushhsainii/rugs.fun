@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 interface Trade {
   id: number;
   buy: number;
+  buy_amount: number;
   sell?: number;
   pnl?: number;
   userId: string;
@@ -35,6 +36,7 @@ let gameState: "WAITING" | "ACTIVE" | "CRASHED" = "WAITING";
 let timer = 0;
 let gameInterval: any;
 let timerInterval: any;
+let gameId: any;
 
 let users: User[] = [];
 let currentGameTicks: GameTick[] = [];
@@ -61,6 +63,18 @@ const startGame = () => {
   currentGameTicks = [];
   tickGenerator = createTickGenerator();
   gameState = "ACTIVE";
+  gameId = uuidv4();
+
+  supabase
+    .from("games_rugs_fun")
+    .insert({
+      game_id: gameId,
+    })
+    .then((res) => {
+      if (res.error) {
+        console.error("ERROR INSERTING GAME");
+      }
+    });
 
   // Tick generator loop
   gameInterval = setInterval(() => {
@@ -68,7 +82,6 @@ const startGame = () => {
     currentMultiplier = tick.value;
     // Record tick
     currentGameTicks.push({ time: Date.now(), value: currentMultiplier });
-    const gameId = uuidv4();
     // Broadcast live tick
     broadcast({
       type: "tick",
@@ -103,35 +116,35 @@ const startGame = () => {
       // Update off chain ledger securely
       supabase
         .from("games_rugs_fun")
-        .insert({
-          game_id: gameId,
+        .update({
           crash_multiplier: currentMultiplier,
           total_volume: total_volume,
         })
+        .eq("game_id", gameId)
         .then((res) => {
           if (res.error) {
             console.error("ERROR INSERTING GAME");
           }
-          const tradesWithGameId = userTrades.map((trade) => ({
-            amount: trade.buy,
-            game_id: gameId,
-            payout_multiplier: trade.sell ?? 0,
-            profit_loss:
-              trade.sell === undefined || !trade.sell
-                ? 0
-                : trade.buy - trade.sell,
-            user_id: trade.userId,
-          }));
+          // const tradesWithGameId = userTrades.map((trade) => ({
+          //   amount: trade.buy,
+          //   game_id: gameId,
+          //   payout_multiplier: trade.sell ?? 0,
+          //   profit_loss:
+          //     trade.sell === undefined || !trade.sell
+          //       ? 0
+          //       : trade.buy - trade.sell,
+          //   user_id: trade.userId,
+          // }));
           // Adding Bulk Entries to Off Chain Ledger Post Crash,
-          supabase
-            .from("trades_rugs_fun")
-            .insert(tradesWithGameId)
-            .then((res) => {
-              if (res.error) {
-                console.log(res.error);
-                console.error("ERROR INSERTING TRADES");
-              }
-            });
+          // supabase
+          //   .from("trades_rugs_fun")
+          //   .insert(tradesWithGameId)
+          //   .then((res) => {
+          //     if (res.error) {
+          //       console.log(res.error);
+          //       console.error("ERROR INSERTING TRADES");
+          //     }
+          //   });
         });
 
       // Broadcast crash
@@ -231,17 +244,32 @@ wss.on("connection", (ws) => {
 
         const trade: Trade = {
           id: Date.now(),
-          buy: data.buy,
+          buy: currentMultiplier,
+          buy_amount: data.buyAmount,
           userId: user.userId,
         };
-        user.trades.push(trade);
-        // global trades array
-        userTrades.push(trade);
-        broadcast({
-          type: "trade-update",
-          userId: user.userId,
-          trades: user.trades,
-        });
+
+        supabase
+          .rpc("buy_trade", {
+            p_wallet_address: data.userId,
+            p_amount: data.buyAmount,
+            p_payout_multiplier: currentMultiplier,
+            p_game_id: gameId,
+          })
+          .then(({ data, error }) => {
+            if (error) console.error(error);
+            else {
+              console.log(data);
+              user.trades.push(trade);
+              // global trades array
+              userTrades.push(trade);
+              broadcast({
+                type: "trade-update",
+                userId: user.userId,
+                trades: user.trades,
+              });
+            }
+          });
       }
       // --- SELL ---
       if (data.type === "sell") {

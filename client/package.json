@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "updatetype": "supabase gen types typescript --project-id apneajyhbpncbciasirk > types/supabase.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",

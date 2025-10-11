@@ -20,6 +20,7 @@ type Numberish = number | string;
 type BetStopLossProps = {
   // Amount input on the left
   amount?: number;
+  setAmount: React.Dispatch<React.SetStateAction<number>>;
   onAmountChange?: (value: number) => void;
   balance?: number;
   min?: number;
@@ -36,6 +37,7 @@ type BetStopLossProps = {
 
 export function BetStopLossControl({
   amount,
+  setAmount,
   onAmountChange,
   min = 0,
   step = 0.001,
@@ -48,11 +50,9 @@ export function BetStopLossControl({
   const { balance } = useUserInformation();
 
   // Controlled/uncontrolled pattern for amount
-  const [internalAmount, setInternalAmount] = React.useState<number>(
-    amount ?? 0
-  );
-  const amt = amount ?? internalAmount;
-  const setAmt = onAmountChange ?? setInternalAmount;
+
+  const amt = amount;
+  const setAmt = onAmountChange ?? setAmount;
 
   // Controlled/uncontrolled pattern for stop % (0-100)
   const [internalStop, setInternalStop] = React.useState<number>(
@@ -95,7 +95,7 @@ export function BetStopLossControl({
       return setAmt(
         Math.max(
           min,
-          Math.min(amt * 2, Number((balance / LAMPORTS_PER_SOL).toFixed(4)))
+          Math.min(amt! * 2, Number((balance / LAMPORTS_PER_SOL).toFixed(4)))
         )
       );
 
@@ -106,7 +106,10 @@ export function BetStopLossControl({
         return setAmt(
           Math.max(
             min,
-            Math.min(amt + inc, Number((balance / LAMPORTS_PER_SOL).toFixed(4)))
+            Math.min(
+              amt! + inc,
+              Number((balance / LAMPORTS_PER_SOL).toFixed(4))
+            )
           )
         );
     }
@@ -130,43 +133,41 @@ export function BetStopLossControl({
   return (
     <div
       className={cn(
-        // Container follows theme tokens; subtle hover + focus ring
-        "bg-primary text-white border border-white/15 rounded-xl p-3 md:p-4 flex flex-col gap-3 transition-all",
-        "hover:shadow-sm hover:border-primary/40 hover:ring-2 hover:ring-primary/10",
-        "md:flex-row md:items-stretch md:gap-4",
+        "bg-black/80 text-white border border-yellow-500/30 rounded-2xl p-4 md:p-5 flex flex-col gap-4 transition-all",
+        "shadow-[0_0_15px_rgba(255,255,0,0.2)] hover:shadow-[0_0_25px_rgba(255,255,0,0.3)] my-5",
+        "md:flex-row md:items-stretch md:gap-6",
         className
       )}
     >
-      {/* Left: Amount input with presets */}
-      <div className="md:flex-1">
+      {/* Left: Amount input + balance */}
+      <div className="md:flex-1 ">
         <InputGroup className="h-12 md:h-14 flex flex-wrap md:flex-nowrap">
           {/* Amount field */}
           <div className="flex-1 min-w-[200px]">
-            <Input
+            <input
               inputMode="decimal"
               type="number"
-              step={step}
-              min={min}
+              step="0.0001"
+              min="0"
               value={amt}
               onChange={(e) => handleAmountInput(e.target.value)}
               aria-label="Bet amount"
               className={cn(
-                "w-full min-w-[200px] font-mono text-lg md:text-2xl text-white px-3 text-right",
-                "bg-white/10 border-white/20 focus-visible:ring-white/30",
-                "placeholder:text-white/60"
+                "w-full font-mono text-lg md:text-2xl text-yellow-300 px-3 py-2 text-right rounded-md outline-none",
+                "bg-white/10 border border-white/20 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/50",
+                "placeholder:text-white/40"
               )}
-              placeholder="0.00"
+              placeholder="0.0000"
             />
           </div>
 
-          {/* Quick actions on the right */}
+          {/* Presets */}
           <InputGroupAddon align="inline-end" className="flex gap-1.5 shrink-0">
             <InputGroupButton
               size="xs"
               variant="ghost"
               onClick={() => applyPreset("X")}
-              aria-label="Clear"
-              className="text-white/80 hover:bg-white/10"
+              className="text-white/80 hover:bg-yellow-500/20"
             >
               ×
             </InputGroupButton>
@@ -176,19 +177,17 @@ export function BetStopLossControl({
                 key={String(p)}
                 size="xs"
                 variant="outline"
-                className={cn(
-                  "text-white/90 border-white/20 hover:bg-white/10"
-                )}
+                className="text-yellow-300 border-yellow-500/30 hover:bg-yellow-400/20"
                 onClick={() => applyPreset(p)}
               >
-                {String(p)}
+                {p}
               </InputGroupButton>
             ))}
 
             {/* Balance pill */}
-            <InputGroupText className="ml-1 flex items-center gap-1 bg-white/5 border border-white/10 rounded-md px-2 py-1">
+            <InputGroupText className="ml-1 flex items-center gap-1 bg-white/10 border border-yellow-500/30 rounded-md px-2 py-1">
               <span className="text-gray-300">Bal</span>
-              <span className="font-mono text-white">
+              <span className="font-mono text-yellow-300">
                 {formatAmt(
                   balance ? Number((balance / LAMPORTS_PER_SOL).toFixed(4)) : 0
                 )}
@@ -198,16 +197,15 @@ export function BetStopLossControl({
         </InputGroup>
       </div>
 
-      {/* Right: Stop-loss presets + slider */}
+      {/* Right: Stop-loss section */}
       <div className="md:flex-1">
         <div
           className={cn(
-            "border border-white/15 rounded-lg px-3 py-2 md:px-3.5 md:py-2.5",
+            "border border-yellow-500/30 rounded-xl px-3 py-3 md:px-4 md:py-3",
             "bg-white/5"
           )}
         >
-          <div className="flex items-center gap-2 md:gap-2.5">
-            {/* Preset chips */}
+          <div className="flex items-center gap-2 md:gap-3">
             <ButtonGroup className="shrink-0">
               {percentPresets.map((p) => {
                 const active = stop === p;
@@ -217,14 +215,13 @@ export function BetStopLossControl({
                     size="sm"
                     variant={active ? "destructive" : "outline"}
                     className={cn(
-                      "h-8 px-2.5 transition-colors",
-                      !active &&
-                        "text-white/90 border-white/20 hover:bg-white/10",
-                      active && "text-white"
+                      "h-8 px-2.5 transition-all font-mono",
+                      active
+                        ? "bg-yellow-500 text-black font-bold shadow-[0_0_10px_rgba(255,255,0,0.6)]"
+                        : "text-yellow-300 border-yellow-500/30 hover:bg-yellow-400/20"
                     )}
                     onClick={() => applyPercentPreset(p)}
                     aria-pressed={active}
-                    aria-label={`Set stop loss to ${p}%`}
                   >
                     {p}%
                   </Button>
@@ -233,25 +230,28 @@ export function BetStopLossControl({
             </ButtonGroup>
 
             {/* Slider */}
-            <div className="flex-1 flex items-center gap-3 md:gap-4">
+            <div className="flex-1 flex items-center gap-4">
               <Slider
                 value={[stop]}
                 onValueChange={(v) => setStop(Math.round(v[0]))}
                 min={0}
                 max={100}
                 className={cn(
-                  "w-full",
-                  "[&_[data-slot='slider-range']]:bg-destructive",
-                  "[&_[data-slot='slider-thumb']]:transition-transform [&_[data-slot='slider-thumb']]:hover:scale-105"
+                  "w-full cursor-pointer",
+                  "[&_[data-slot='slider-track']]:bg-white/10",
+                  "[&_[data-slot='slider-range']]:bg-yellow-400",
+                  "[&_[data-slot='slider-thumb']]:bg-yellow-300",
+                  "[&_[data-slot='slider-thumb']]:hover:scale-110"
                 )}
               />
-              <div className="w-16 text-right font-mono tabular-nums text-white">
-                {stop} <span className="text-gray-300">%</span>
+              <div className="w-16 text-right font-mono text-yellow-300">
+                {stop} <span className="text-white/60">%</span>
               </div>
             </div>
           </div>
-          <div className="mt-2 text-xs text-gray-300">
-            Auto-sell triggers when price drops by the selected percentage.
+
+          <div className="mt-2 text-xs text-gray-400">
+            Auto-sell triggers when price drops by selected percentage.
           </div>
         </div>
       </div>

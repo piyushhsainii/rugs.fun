@@ -178,6 +178,7 @@ export type Database = {
           created_at: string
           depositedBalance: number | null
           id: string
+          user_name: string | null
           wallet_address: string | null
         }
         Insert: {
@@ -185,6 +186,7 @@ export type Database = {
           created_at?: string
           depositedBalance?: number | null
           id?: string
+          user_name?: string | null
           wallet_address?: string | null
         }
         Update: {
@@ -192,6 +194,7 @@ export type Database = {
           created_at?: string
           depositedBalance?: number | null
           id?: string
+          user_name?: string | null
           wallet_address?: string | null
         }
         Relationships: []
@@ -201,7 +204,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      buy_trade: {
+        Args: {
+          p_amount: number
+          p_game_id: string
+          p_payout_multiplier: number
+          p_wallet_address: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

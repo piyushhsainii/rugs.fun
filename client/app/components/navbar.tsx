@@ -6,9 +6,10 @@ import {
   createUser,
   MaxWithdrawAmountAllowed,
   updateBalance,
+  updateUsername,
 } from "../../server/server";
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Check, Menu } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -39,8 +40,9 @@ import { useUserInformation } from "../hooks/userInfo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Navbar = () => {
-  const { publicKey, connected, disconnect, connect, select } = useWallet();
-  const { balance, setBalance, error, loading, refetch } = useUserInformation();
+  const { publicKey, connected, disconnect } = useWallet();
+  const { balance, setBalance, setUserName, userName } = useUserInformation();
+  const [changeusername, setchangeusername] = useState(userName);
   const [tokenamount, setTokenAmount] = useState("0");
   const wallet = useWallet();
 
@@ -197,8 +199,11 @@ const Navbar = () => {
     }
   };
 
+  useEffect(() => {}, [userName]);
+  console.log(userName);
+
   return (
-    <div className="w-full flex justify-evenly items-center text-white">
+    <div className="w-full flex justify-around items-center text-white ">
       <div>
         <Link href={"/"}>
           <div
@@ -228,46 +233,48 @@ const Navbar = () => {
       </div>
 
       {/* Wallet / Menu */}
-      {connected ? (
-        <Dialog>
-          <DialogTrigger>
-            <Menu
-              stroke="black"
-              strokeWidth={4}
-              absoluteStrokeWidth
-              className="bg-yellow-400/90 rounded-sm p-1 m-3 cursor-pointer"
-            />
-          </DialogTrigger>
-          <Tabs>
-            <DialogContent className="flex flex-col">
-              <DialogTitle className="font-mono text-yellow-400">
-                <TabsList>
-                  <TabsTrigger value="1">Deposit</TabsTrigger>
-                  <TabsTrigger value="2">Withdraw</TabsTrigger>
-                </TabsList>
-              </DialogTitle>
-              <TabsContent value="1">
-                <label
-                  htmlFor=""
-                  className="text-xs font-sans text-yellow-400 brightness-75 "
-                >
-                  SOL Amount
-                </label>
-                <input
-                  type="number"
-                  placeholder="Deposit Amount"
-                  value={`${tokenamount}`}
-                  onChange={(e) => {
-                    setTokenAmount(e.target.value);
-                  }}
-                  className="outline-none  p-3 ml-0 border border-yellow-400/50 w-full rounded-xl placeholder:text-gray-300 text-yellow-400 bg-yellow-600/10 placeholder:font-mono placeholder:text-xs"
+      <div>
+        {connected ? (
+          <div className="flex items-center gap-1 ">
+            <Dialog>
+              <DialogTrigger>
+                <Menu
+                  stroke="black"
+                  strokeWidth={4}
+                  absoluteStrokeWidth
+                  className="bg-yellow-400/90 rounded-sm p-1 m-3 cursor-pointer"
                 />
-                <Button
-                  onClick={depositFunds}
-                  className="text-base cursor-pointer px-8 my-2 mb-5 bg-yellow-300 hover:bg-yellow-500 text-black font-semibold font-sans rounded-full"
-                  style={{
-                    fontWeight: "bold",
-                    textShadow: `
+              </DialogTrigger>
+              <Tabs>
+                <DialogContent className="flex flex-col">
+                  <DialogTitle className="font-mono text-yellow-400">
+                    <TabsList>
+                      <TabsTrigger value="1">Deposit</TabsTrigger>
+                      <TabsTrigger value="2">Withdraw</TabsTrigger>
+                    </TabsList>
+                  </DialogTitle>
+                  <TabsContent value="1">
+                    <label
+                      htmlFor=""
+                      className="text-xs font-sans text-yellow-400 brightness-75 "
+                    >
+                      SOL Amount
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="Deposit Amount"
+                      value={`${tokenamount}`}
+                      onChange={(e) => {
+                        setTokenAmount(e.target.value);
+                      }}
+                      className="outline-none  p-3 ml-0 border border-yellow-400/50 w-full rounded-xl placeholder:text-gray-300 text-yellow-400 bg-yellow-600/10 placeholder:font-mono placeholder:text-xs"
+                    />
+                    <Button
+                      onClick={depositFunds}
+                      className="text-base cursor-pointer px-8 my-2 mb-5 bg-yellow-300 hover:bg-yellow-500 text-black font-semibold font-sans rounded-full"
+                      style={{
+                        fontWeight: "bold",
+                        textShadow: `
                   3px 3px 0 #000000,
                   -3px -3px 0 #000000,
                   3px -3px 0 #000000,
@@ -278,51 +285,51 @@ const Navbar = () => {
                   2px -2px 0 #FFD700,
                   -2px 2px 0 #FFD700,
                 `,
-                  }}
-                >
-                  Deposit
-                </Button>
-              </TabsContent>
-              <TabsContent value="2">
-                <label
-                  htmlFor=""
-                  className="text-xs font-sans text-yellow-400 brightness-75 pl-1 py-1"
-                >
-                  SOL Amount
-                </label>
-                <input
-                  type="number"
-                  placeholder="Withdraw Amount"
-                  value={`${tokenamount}`}
-                  onChange={(e) => {
-                    setTokenAmount(e.target.value);
-                  }}
-                  className="outline-none  p-3 ml-0 border border-yellow-400/50 w-full rounded-xl placeholder:text-gray-300 text-yellow-400 bg-yellow-600/10 placeholder:font-mono placeholder:text-xs"
-                />
-                <div className="w-full flex justify-between text-xs items-center my-1 ">
-                  <div className="brightness-75 text-yellow-400 px-2">
-                    {" "}
-                    Available to withdraw:{" "}
-                    {balance &&
-                      Number(balance / LAMPORTS_PER_SOL).toFixed(4)}{" "}
-                  </div>
-                  <div
-                    className="border border-yellow-400/50  rounded-full px-3 py-1 text-xs cursor-pointer hover:bg-yellow-400/80 hover:text-white"
-                    onClick={() =>
-                      setTokenAmount(
-                        Number(balance! / LAMPORTS_PER_SOL).toFixed(4)
-                      )
-                    }
-                  >
-                    {" "}
-                    MAX{" "}
-                  </div>
-                </div>
-                <Button
-                  onClick={withdrawFunds}
-                  className="text-base cursor-pointer  mb-5 px-8 mt-2  bg-yellow-300 hover:bg-yellow-500 text-black font-semibold font-sans rounded-full"
-                  style={{
-                    textShadow: `
+                      }}
+                    >
+                      Deposit
+                    </Button>
+                  </TabsContent>
+                  <TabsContent value="2">
+                    <label
+                      htmlFor=""
+                      className="text-xs font-sans text-yellow-400 brightness-75 pl-1 py-1"
+                    >
+                      SOL Amount
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="Withdraw Amount"
+                      value={`${tokenamount}`}
+                      onChange={(e) => {
+                        setTokenAmount(e.target.value);
+                      }}
+                      className="outline-none  p-3 ml-0 border border-yellow-400/50 w-full rounded-xl placeholder:text-gray-300 text-yellow-400 bg-yellow-600/10 placeholder:font-mono placeholder:text-xs"
+                    />
+                    <div className="w-full flex justify-between text-xs items-center my-1 ">
+                      <div className="brightness-75 text-yellow-400 px-2">
+                        {" "}
+                        Available to withdraw:{" "}
+                        {balance &&
+                          Number(balance / LAMPORTS_PER_SOL).toFixed(4)}{" "}
+                      </div>
+                      <div
+                        className="border border-yellow-400/50  rounded-full px-3 py-1 text-xs cursor-pointer hover:bg-yellow-400/80 hover:text-white"
+                        onClick={() =>
+                          setTokenAmount(
+                            Number(balance! / LAMPORTS_PER_SOL).toFixed(4)
+                          )
+                        }
+                      >
+                        {" "}
+                        MAX{" "}
+                      </div>
+                    </div>
+                    <Button
+                      onClick={withdrawFunds}
+                      className="text-base cursor-pointer  mb-5 px-8 mt-2  bg-yellow-300 hover:bg-yellow-500 text-black font-semibold font-sans rounded-full"
+                      style={{
+                        textShadow: `
                   3px 3px 0 #000000,
                   -3px -3px 0 #000000,
                   3px -3px 0 #000000,
@@ -333,46 +340,117 @@ const Navbar = () => {
                   2px -2px 0 #FFD700,
                   -2px 2px 0 #FFD700,
                 `,
+                      }}
+                    >
+                      Withdraw
+                    </Button>
+                  </TabsContent>
+                  <DialogFooter>
+                    <div className="w-full flex justify-between items-center ">
+                      <Button
+                        onClick={async () => await disconnect()}
+                        className="brightness-100 cursor-pointer rounded-full px-5 py-1 text-red-500 font-semibold bg-black/20 border-black"
+                      >
+                        disconnect
+                      </Button>
+                      <Link
+                        href={"/faucet"}
+                        className="text-xs brightness-75 underline"
+                      >
+                        Checkout our SOL faucet to mint some tokens!
+                      </Link>
+                    </div>
+                  </DialogFooter>
+                </DialogContent>
+              </Tabs>
+            </Dialog>
+            <div className="w-full max-w-sm">
+              {userName && userName === "guest" ? (
+                <div className="flex items-center gap-1 ">
+                  <input
+                    type="text"
+                    placeholder="Set Username"
+                    onChange={(e) => {
+                      setchangeusername(e.target.value);
+                    }}
+                    className="
+                  w-full
+                  px-4 py-1
+                  text-white
+                  placeholder-yellow-300
+                  bg-yellow-400/20
+                  backdrop-blur-sm
+                  border border-yellow-400/50
+                  rounded-lg
+                  focus:outline-none
+                  focus:ring-2
+                  focus:ring-yellow-400
+                  transition
+                  duration-200
+                  placeholder-opacity-70
+                  "
+                  />
+                  {userName !== changeusername &&
+                    changeusername !== "" &&
+                    changeusername !== null && (
+                      <Check
+                        size={20}
+                        className="m-1 hover:scale-125 transition-all duration-150 bg-green-400 cursor-pointer active:scale-75"
+                        onClick={async () => {
+                          const res = await updateUsername(
+                            wallet.publicKey!.toString(),
+                            changeusername
+                          );
+                          if (!res) return;
+                          setUserName(res);
+                        }}
+                      />
+                    )}
+                </div>
+              ) : (
+                <div
+                  className="font-extrabold text-2xl cursor-pointer text-yellow-400"
+                  style={{
+                    textShadow: `
+            /* Black bold outline (4 directions) */
+            3px 3px 0 #000,
+            -3px -3px 0 #000,
+            3px -3px 0 #000,
+            -3px 3px 0 #000,
+
+            /* Yellow accent layer */
+            2px 2px 0 #FFD700,
+            -2px -2px 0 #FFD700,
+            2px -2px 0 #FFD700,
+            -2px 2px 0 #FFD700,
+
+            /* Soft white glow */
+            0 0 5px rgba(255, 255, 255, 0.7)
+          `,
                   }}
                 >
-                  Withdraw
-                </Button>
-              </TabsContent>
-              <DialogFooter>
-                <div className="w-full flex justify-between items-center ">
-                  <Button
-                    onClick={async () => await disconnect()}
-                    className="brightness-100 cursor-pointer rounded-full px-5 py-1 text-red-500 font-semibold bg-black/20 border-black"
-                  >
-                    disconnect
-                  </Button>
-                  <Link
-                    href={"/faucet"}
-                    className="text-xs brightness-75 underline"
-                  >
-                    Checkout our SOL faucet to mint some tokens!
-                  </Link>
+                  {userName ?? "loading..."}
                 </div>
-              </DialogFooter>
-            </DialogContent>
-          </Tabs>
-        </Dialog>
-      ) : (
-        <WalletMultiButton
-          className="text-xl cursor-pointer px-5 py-2 rounded-lg text-shadow-amber-300 text-shadow-sm"
-          style={{
-            background: "none",
-            color: "#FFFFFF",
-            fontWeight: "semibold",
-            textShadow: `
+              )}
+            </div>
+          </div>
+        ) : (
+          <WalletMultiButton
+            className="text-xl cursor-pointer px-5 py-2 rounded-lg text-shadow-amber-300 text-shadow-sm"
+            style={{
+              background: "none",
+              color: "#FFFFFF",
+              fontWeight: "semibold",
+              textShadow: `
     1.4px 1.1px 0.1px rgba(0, 0, 0, 1),      /* black shadow (base) */
     2px 1.6px 0.2px rgba(252, 211, 77, 1)  /* yellow shadow next to it */
   `,
-          }}
-        >
-          Connect Wallet
-        </WalletMultiButton>
-      )}
+            }}
+          >
+            Connect Wallet
+          </WalletMultiButton>
+        )}
+      </div>
     </div>
   );
 };

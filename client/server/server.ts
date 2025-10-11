@@ -128,3 +128,56 @@ export async function MaxWithdrawAmountAllowed(wallet_address: string) {
 
   return balance.balance;
 }
+
+export const fetchUsername = async (wallet_address: string) => {
+  console.log(`1`);
+  if (!wallet_address) return;
+  console.log(`2`);
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("users_rugsfun")
+      .select("*")
+      .eq("wallet_address", wallet_address.toString())
+      .single();
+
+    if (error) {
+      console.log(`Could not fetch username`, error);
+      return;
+    }
+    return data.user_name;
+  } catch (error) {
+    console.log(`Error occured`, error);
+    return null;
+  }
+};
+export const updateUsername = async (
+  wallet_address: string,
+  user_name: string
+) => {
+  console.log(`1`);
+  if (!wallet_address) return;
+  console.log(`2`);
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("users_rugsfun")
+      .update({
+        user_name: user_name,
+      })
+      .eq("wallet_address", wallet_address.toString())
+      .select()
+      .single();
+
+    if (error) {
+      console.log(`Could not fetch username`, error);
+      return;
+    }
+    return data.user_name;
+  } catch (error) {
+    console.log(`Error occured`, error);
+    return null;
+  }
+};

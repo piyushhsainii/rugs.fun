@@ -116,6 +116,9 @@ export default function useGameWebSocket() {
             }
           });
         }
+        if (data.type === "prev-game") {
+          setPreviousGames(data.data);
+        }
       } catch (e) {
         console.error("Invalid WS message:", e);
       }

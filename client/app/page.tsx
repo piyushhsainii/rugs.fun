@@ -31,6 +31,7 @@ interface Trade {
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [internalAmount, setInternalAmount] = useState<number>(0);
   // constants
   const CANDLE_WIDTH = 30;
   const GAP = 6;
@@ -71,12 +72,21 @@ export default function Home() {
     prevGameRef.current = previousGames;
   }, [previousGames]);
 
+  console.log(`amount`, internalAmount);
+
   const handleBuy = () => {
     console.log(`Coming in buy`);
     const userId = wallet.publicKey;
     // if(balance)
     const buyPrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
-    wsRef.current?.send(JSON.stringify({ type: "buy", userId, buy: buyPrice }));
+    wsRef.current?.send(
+      JSON.stringify({
+        type: "buy",
+        userId: userId,
+        buy: buyPrice,
+        buyAmount: internalAmount,
+      })
+    );
   };
 
   const handleSell = () => {
@@ -461,25 +471,18 @@ export default function Home() {
             <Leaderboard data={allUserTrades} />
           </div>
           {prevGameRef && previousGames.length > 0 && (
-            <div className="max-w-[300px] flex flex-col overflow-hidden">
+            <div className=" flex flex-col overflow-hidden">
               {/* @ts-ignore */}
               <SummaryPrevGames gameData={previousGames} />
             </div>
           )}
         </main>
       </div>
-      <section className="flex flex-col items-start justify-start max-w-[2400px] mx-auto pr-64">
-        <div className="text-center mt-4">
-          {/* <BetStopLossControl /> */}
-          <div className="text-white mt-2">
-            {gameState === "ACTIVE" && "Round in Progress..."}
-            {gameState === "CRASHED" && "Crashed!"}
-            {gameState === "WAITING" && "Starting soon..."}
-          </div>
-        </div>
-
-        <BetStopLossControl />
-
+      <section className="flex flex-col items-start justify-start max-w-[2400px] mx-auto pr-64 gap-4">
+        <BetStopLossControl
+          amount={internalAmount}
+          setAmount={setInternalAmount}
+        />
         {/* Pay Button */}
         <div className="mt-4 flex gap-4 justify-center">
           <Button

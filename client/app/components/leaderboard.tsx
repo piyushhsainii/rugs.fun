@@ -72,7 +72,7 @@ export function Leaderboard({
   return (
     <Card
       className={cn(
-        "bg-[#0f0f10] border border-yellow-400/40 rounded-xl shadow-sm w-auto lg:w-[350px] text-white",
+        "bg-[#0f0f10] border border-yellow-400/40 rounded-xl max-h-[300px] overflow-auto shadow-sm w-auto lg:w-[350px] text-white",
         "transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-gray-700/40",
         className
       )}
