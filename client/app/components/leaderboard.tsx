@@ -72,7 +72,7 @@ export function Leaderboard({
   return (
     <Card
       className={cn(
-        "bg-[#0f0f10] border border-yellow-400/40 rounded-xl max-h-[300px] overflow-auto shadow-sm w-auto lg:w-[350px] text-white",
+        "bg-[#0f0f10] border border-yellow-400/40 rounded-xl h-auto shadow-sm w-auto lg:w-[380px] text-white",
         "transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-gray-700/40",
         className
       )}
@@ -111,7 +111,7 @@ export function Leaderboard({
         ) : null}
       </div>
 
-      <div className="px-6 py-5">
+      <div className="px-6">
         {rows.length === 0 ? (
           <div
             className={cn(
@@ -123,7 +123,7 @@ export function Leaderboard({
             <p className="text-sm text-gray-400">No trades to display.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-gray-700">
+          <div className="rounded-lg border border-gray-700  h-[340px] overflow-auto custom-scrollbar ">
             <div className="overflow-x-auto">
               <Table className="min-w-full">
                 <TableHeader className="bg-gray-800/50">

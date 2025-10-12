@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
 
 export default function useGameWebSocket() {
   const userId = localStorage.getItem("userId");
@@ -10,9 +9,24 @@ export default function useGameWebSocket() {
   const [clientsConnected, setClientsConnected] = useState(0);
   const [allUserTrades, setAllUserTrades] = useState<
     { userId: string; trades: any[] }[]
-  >([]);
+  >([
+    {
+      userId: "213",
+      trades: [
+        {
+          key: "",
+          userId: "",
+          tradeId: "123",
+          buy: 1.2,
+          sell: 2.4,
+          pnl: 2,
+        },
+      ],
+    },
+  ]);
   const [previousGames, setPreviousGames] = useState<any[]>([]);
   const [history, setHistory] = useState<number[]>([]);
+  const [latency, setLatency] = useState<number | null>(null);
   const [timer, setTimer] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
   const historyRef = useRef<number[]>([]);
@@ -36,6 +50,24 @@ export default function useGameWebSocket() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        const message = JSON.parse(event.data);
+
+        if (message.type === "PING") {
+          console.log(`Received PING`, message);
+          ws.send(
+            JSON.stringify({
+              type: "PONG",
+              serverTimestamp: message.serverTimestamp,
+            })
+          );
+          console.log(`Sending PONG`);
+        }
+
+        if (message.type === "LATENCY_UPDATE") {
+          console.log(`Latency update in`, message);
+          setLatency(message.latency);
+        }
 
         // 🟢 Connected clients count
         if (data.type === "client-count") {
@@ -139,6 +171,8 @@ export default function useGameWebSocket() {
     };
   }, [userId]);
 
+  console.log(latency, "latency");
+
   return {
     gameState,
     history,
@@ -150,6 +184,7 @@ export default function useGameWebSocket() {
     targetMultiplierRef,
     timer,
     userId,
+    latency,
     setGameState,
   };
 }

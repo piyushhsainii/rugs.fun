@@ -20,6 +20,7 @@ import { MINT_ADDRESS } from "@/constants/constants";
 import { supabase } from "@/supabase/client";
 import { useUserInformation } from "./hooks/userInfo";
 import BetStopLossControl from "./components/control-panel";
+import { Wifi } from "lucide-react";
 
 interface Trade {
   id: number;
@@ -54,6 +55,7 @@ export default function Home() {
     userId,
     clientsConnected,
     wsRef,
+    latency,
   } = useGameWebSocket();
 
   const { balance, setBalance, error, loading, refetch } = useUserInformation();
@@ -84,7 +86,7 @@ export default function Home() {
         type: "buy",
         userId: userId,
         buy: buyPrice,
-        buyAmount: internalAmount,
+        buyAmount: internalAmount * LAMPORTS_PER_SOL,
       })
     );
   };
@@ -317,6 +319,96 @@ export default function Home() {
       lastValue = val;
     }
 
+    if (allUserTrades && allUserTrades.length > 0) {
+      // Filter trades for current user
+      const myTrades = allUserTrades.filter(
+        (trade: any) => trade.userId === wallet.publicKey?.toBase58()
+      );
+
+      myTrades.forEach((trade: any) => {
+        if (trade.buy && !trade.sell) {
+          // Only show active positions (bought but not sold)
+          const buyPrice = trade.buy;
+
+          // Find the candle index where buy price matches or is closest to historical data
+          // We need to find which candle in visibleData corresponds to this buy
+          let buyIndex = -1;
+
+          // Search through visible candles to find the one that matches the buy price
+          // This assumes the buy happened on one of the visible candles
+          for (let i = 0; i < visibleData.length; i++) {
+            const candlePrice = visibleData[i];
+            // Check if buy price is close to this candle's price (within tolerance)
+            if (Math.abs(candlePrice - buyPrice) < 0.01) {
+              buyIndex = i;
+              break;
+            }
+          }
+
+          // If exact match not found, find the candle where price was closest
+          if (buyIndex === -1) {
+            let minDiff = Infinity;
+            for (let i = 0; i < visibleData.length; i++) {
+              const diff = Math.abs(visibleData[i] - buyPrice);
+              if (diff < minDiff) {
+                minDiff = diff;
+                buyIndex = i;
+              }
+            }
+          }
+
+          // Only draw if we found a valid candle index
+          if (buyIndex >= 0 && buyIndex < visibleData.length) {
+            const markerX =
+              LEFT_PADDING + buyIndex * (CANDLE_WIDTH + GAP) + CANDLE_WIDTH / 2;
+            const markerY = scaleY(buyPrice);
+
+            // Draw a circle marker
+            ctx.beginPath();
+            ctx.arc(markerX, markerY, 8, 0, Math.PI * 2);
+            ctx.fillStyle = "#3b82f6"; // Blue color
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw "BUY" label above the marker
+            ctx.font = "bold 12px Inter";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "bottom";
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText("BUY", markerX, markerY - 12);
+
+            // Optional: Draw a horizontal line from buy point
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(LEFT_PADDING, markerY);
+            ctx.lineTo(width, markerY);
+            ctx.strokeStyle = "rgba(59, 130, 246, 0.4)"; // Semi-transparent blue
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Optional: Show price label
+            const buyLabel = `${buyPrice.toFixed(3)}x`;
+            ctx.font = "bold 14px Inter";
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            const labelWidth = ctx.measureText(buyLabel).width;
+            ctx.fillStyle = "rgba(59, 130, 246, 0.9)";
+            ctx.fillRect(
+              LEFT_PADDING - labelWidth - 18,
+              markerY - 12,
+              labelWidth + 12,
+              24
+            );
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(buyLabel, LEFT_PADDING - 10, markerY);
+          }
+        }
+      });
+    }
+
     // Forming candle (animated growth from lastValue -> current)
     const formingX = LEFT_PADDING + visibleData.length * (CANDLE_WIDTH + GAP);
     const formingOpen = lastValue;
@@ -434,7 +526,26 @@ export default function Home() {
         {/* Left: Chart */}
         <div className="flex-1">
           <div className="mb-4 flex justify-between items-center">
-            <h1 className="text-white text-2xl font-bold">Rug.fun (clone)</h1>
+            <h1 className="text-white text-2xl font-bold">
+              Rug.fun (clone)
+              <div>
+                {latency !== null && (
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`text-sm font-semibold flex items-center gap-1 ${
+                        latency < 50
+                          ? "text-green-500"
+                          : latency < 100
+                          ? "text-yellow-500"
+                          : "text-red-500"
+                      }`}
+                    >
+                      {latency}ms <Wifi size={15} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </h1>
             <div className=" bg-yellow-400 px-3 py-1 rounded-lg text-black font-bold font-mono">
               Balance:
               <span className="text-black font-bold font-mono">
@@ -484,7 +595,7 @@ export default function Home() {
           setAmount={setInternalAmount}
         />
         {/* Pay Button */}
-        <div className="mt-4 flex gap-4 justify-center">
+        <div className="mt-4 flex gap-4 justify-center w-full max-w-[300px] mx-auto">
           <Button
             onClick={handleBuy}
             disabled={
@@ -492,9 +603,9 @@ export default function Home() {
               gameStateRef.current == "CRASHED" ||
               gameStateRef.current == "WAITING"
                 ? true
-                : false
+                : false || internalAmount == 0
             }
-            className={`bg-green-600 hover:bg-green-700 h-10 w-32 shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
+            className={`bg-green-600 hover:bg-green-700 h-10 w-full shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
             style={{
               textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
               boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
@@ -509,9 +620,9 @@ export default function Home() {
               gameStateRef.current == "CRASHED" ||
               gameStateRef.current == "WAITING"
                 ? true
-                : false
+                : false || internalAmount == 0
             }
-            className={`bg-red-600 hover:bg-red-700 h-10 w-32 shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
+            className={`bg-red-600 hover:bg-red-700 h-10 w-full shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
             style={{
               textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
               boxShadow: "0 5px 15px rgba(0,0,0,0.5)",

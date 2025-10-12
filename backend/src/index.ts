@@ -65,16 +65,27 @@ const startGame = () => {
   gameState = "ACTIVE";
   gameId = uuidv4();
 
-  supabase
-    .from("games_rugs_fun")
-    .insert({
-      game_id: gameId,
-    })
-    .then((res) => {
-      if (res.error) {
-        console.error("ERROR INSERTING GAME");
-      }
-    });
+  console.log("Attempting to insert game_id:", gameId);
+  try {
+    supabase
+      .from("games_rugs_fun")
+      .insert({
+        game_id: gameId,
+      })
+      .then((res) => {
+        console.log("Insert response:", res);
+
+        if (res.error) {
+          console.error("ERROR INSERTING GAME:", res);
+          console.error("Error details:", JSON.stringify(res.error, null, 2));
+        } else {
+          console.log("✅ Successfully inserted Game ID:", gameId);
+          console.log("Insert data:", res.data);
+        }
+      });
+  } catch (error) {
+    console.log(`Error`, error);
+  }
 
   // Tick generator loop
   gameInterval = setInterval(() => {
@@ -125,26 +136,6 @@ const startGame = () => {
           if (res.error) {
             console.error("ERROR INSERTING GAME");
           }
-          // const tradesWithGameId = userTrades.map((trade) => ({
-          //   amount: trade.buy,
-          //   game_id: gameId,
-          //   payout_multiplier: trade.sell ?? 0,
-          //   profit_loss:
-          //     trade.sell === undefined || !trade.sell
-          //       ? 0
-          //       : trade.buy - trade.sell,
-          //   user_id: trade.userId,
-          // }));
-          // Adding Bulk Entries to Off Chain Ledger Post Crash,
-          // supabase
-          //   .from("trades_rugs_fun")
-          //   .insert(tradesWithGameId)
-          //   .then((res) => {
-          //     if (res.error) {
-          //       console.log(res.error);
-          //       console.error("ERROR INSERTING TRADES");
-          //     }
-          //   });
         });
 
       // Broadcast crash
@@ -185,6 +176,18 @@ const startGame = () => {
 wss.on("connection", (ws) => {
   console.log("🟢 New client connected");
 
+  setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      console.log(`Sending PING`);
+      ws.send(
+        JSON.stringify({
+          type: "PING",
+          serverTimestamp: Date.now(),
+        })
+      );
+    }
+  }, 2000);
+
   // Send initial state & recent game history
   ws.send(
     JSON.stringify({
@@ -207,6 +210,20 @@ wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     try {
       const data = JSON.parse(message.toString());
+
+      if (data.type === "PONG") {
+        console.log(`Received PONG`);
+        const rtt = Date.now() - data.serverTimestamp;
+        const latency = Math.round(rtt / 2);
+
+        ws.send(
+          JSON.stringify({
+            type: "LATENCY_UPDATE",
+            latency,
+          })
+        );
+      }
+
       // --- Identify / Reconnect user ---
       if (data.type === "identify") {
         const user = users.find((u) => u.userId === data.userId);
@@ -248,7 +265,7 @@ wss.on("connection", (ws) => {
           buy_amount: data.buyAmount,
           userId: user.userId,
         };
-
+        // check for balance if trade is valid and update balance.
         supabase
           .rpc("buy_trade", {
             p_wallet_address: data.userId,
@@ -256,10 +273,14 @@ wss.on("connection", (ws) => {
             p_payout_multiplier: currentMultiplier,
             p_game_id: gameId,
           })
-          .then(({ data, error }) => {
+          .then(({ data, error }: { data: any; error: any }) => {
             if (error) console.error(error);
             else {
-              console.log(data);
+              console.log("✅ Buy trade result:", data);
+              console.log("Trade ID:", data.trade_id);
+              console.log("Old balance:", data.old_balance);
+              console.log("New balance:", data.new_balance);
+              console.log("Amount deducted:", data.amount_deducted);
               user.trades.push(trade);
               // global trades array
               userTrades.push(trade);
@@ -289,11 +310,51 @@ wss.on("connection", (ws) => {
         openGlobalTrade.pnl =
           ((data.sell - openGlobalTrade.buy) / openGlobalTrade.buy) * 100;
 
-        broadcast({
-          type: "trade-update",
-          userId: user.userId,
-          trades: user.trades,
-        });
+        supabase
+          .rpc("sell_trade", {
+            p_wallet_address: data.userId,
+            p_sell_multiplier: data.sell,
+            p_game_id: gameId,
+          })
+          .then(({ data: rpcData, error }) => {
+            if (error) {
+              console.error("❌ Error selling trade:", error);
+              ws.send(
+                JSON.stringify({
+                  type: "error",
+                  message: error.message || "Failed to sell trade",
+                })
+              );
+              return;
+            }
+            console.log("✅ Trade sold successfully for user:", data.userId);
+
+            // Update local state
+            openTrade.sell = data.sell;
+            openTrade.pnl = ((data.sell - openTrade.buy) / openTrade.buy) * 100;
+
+            // Update global trades array
+            const openGlobalTrade = userTrades.find(
+              (t) => t.userId === data.userId && t.sell === undefined
+            );
+            if (openGlobalTrade) {
+              openGlobalTrade.sell = data.sell;
+              openGlobalTrade.pnl = openTrade.pnl;
+            }
+            console.log("✅ Sold trade result:", rpcData);
+            // Broadcast updated trades to specific user
+            broadcast({
+              type: "trade-update",
+              userId: user.userId,
+              trades: user.trades,
+            });
+
+            // Broadcast all trades update to everyone
+            // broadcast({
+            //   type: "all-trades",
+            //   trades: userTrades,
+            // });
+          });
       }
     } catch (err) {
       console.error("❌ Invalid WS message:", err);
