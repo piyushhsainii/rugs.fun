@@ -6,33 +6,16 @@ import Leaderboard from "./components/leaderboard";
 import useGameWebSocket from "./hooks/socket";
 import { Button } from "@/components/ui/button";
 import SummaryPrevGames from "./components/summary-data";
-import {
-  clusterApiUrl,
-  Connection,
-  LAMPORTS_PER_SOL,
-  PublicKey,
-} from "@solana/web3.js";
-import {
-  getAssociatedTokenAddress,
-  TOKEN_2022_PROGRAM_ID,
-} from "@solana/spl-token";
-import { MINT_ADDRESS } from "@/constants/constants";
-import { supabase } from "@/supabase/client";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useUserInformation } from "./hooks/userInfo";
 import BetStopLossControl from "./components/control-panel";
-import { Wifi } from "lucide-react";
-
-interface Trade {
-  id: number;
-  buy: number;
-  sell?: number;
-  pnl?: number;
-}
+import { RefreshCcw, Wifi } from "lucide-react";
+import { ChatSidebar } from "./components/chat-sidebar";
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [trades, setTrades] = useState<Trade[]>([]);
   const [internalAmount, setInternalAmount] = useState<number>(0);
+
   // constants
   const CANDLE_WIDTH = 30;
   const GAP = 6;
@@ -50,7 +33,6 @@ export default function Home() {
     previousGames,
     timer,
     historyRef,
-    setGameState,
     targetMultiplierRef,
     userId,
     clientsConnected,
@@ -58,7 +40,7 @@ export default function Home() {
     latency,
   } = useGameWebSocket();
 
-  const { balance, setBalance, error, loading, refetch } = useUserInformation();
+  const { balance, setBalance, refetch } = useUserInformation();
 
   // store gameState in a ref that updates each render
   const gameStateRef = useRef(gameState);
@@ -74,8 +56,6 @@ export default function Home() {
     prevGameRef.current = previousGames;
   }, [previousGames]);
 
-  console.log(`amount`, internalAmount);
-
   const handleBuy = () => {
     console.log(`Coming in buy`);
     const userId = wallet.publicKey;
@@ -88,6 +68,9 @@ export default function Home() {
         buy: buyPrice,
         buyAmount: internalAmount * LAMPORTS_PER_SOL,
       })
+    );
+    setBalance((prevBal) =>
+      prevBal ? prevBal - internalAmount : internalAmount
     );
   };
 
@@ -160,7 +143,7 @@ export default function Home() {
       // 2️⃣ Then draw bright, glowing "RUGGED!"
       const pulse = 0.05 * Math.sin(Date.now() / 120) + 1; // subtle pulse
       ctx.globalAlpha = 1;
-      ctx.font = `900 ${Math.floor(height * 0.14)}px Inter`;
+      ctx.font = `900 ${Math.floor(height * 0.14)}px Sans-Serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
@@ -173,6 +156,16 @@ export default function Home() {
       // Core text color — bright red
       ctx.fillStyle = "rgb(255, 30, 30)";
       ctx.fillText("RUGGED!", width / 2, height / 2);
+
+      // 4️⃣ Add laughing emoji — slightly below the text
+      ctx.shadowBlur = 0;
+      ctx.font = `bold ${Math.floor(
+        height * 0.1
+      )}px "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+
+      // make it bounce a bit for fun
+      const bounce = Math.sin(Date.now() / 300) * 8;
+      ctx.fillText("😂", width / 2, height / 2 + height * 0.18 + bounce);
 
       ctx.restore();
     }
@@ -319,95 +312,73 @@ export default function Home() {
       lastValue = val;
     }
 
-    if (allUserTrades && allUserTrades.length > 0) {
-      // Filter trades for current user
-      const myTrades = allUserTrades.filter(
-        (trade: any) => trade.userId === wallet.publicKey?.toBase58()
-      );
+    // --- draw marker for buy/sell points ---
+    const drawTradeMarker = (
+      ctx: CanvasRenderingContext2D,
+      x: number,
+      y: number,
+      type: "buy" | "sell",
+      label: string
+    ) => {
+      ctx.save();
+      ctx.beginPath();
 
-      myTrades.forEach((trade: any) => {
-        if (trade.buy && !trade.sell) {
-          // Only show active positions (bought but not sold)
-          const buyPrice = trade.buy;
+      if (type === "buy") {
+        ctx.fillStyle = "#22c55e"; // green
+        ctx.moveTo(x, y - 8);
+        ctx.lineTo(x - 6, y + 6);
+        ctx.lineTo(x + 6, y + 6);
+      } else {
+        ctx.fillStyle = "#ef4444"; // red
+        ctx.moveTo(x, y + 8);
+        ctx.lineTo(x - 6, y - 6);
+        ctx.lineTo(x + 6, y - 6);
+      }
 
-          // Find the candle index where buy price matches or is closest to historical data
-          // We need to find which candle in visibleData corresponds to this buy
-          let buyIndex = -1;
+      ctx.closePath();
+      ctx.fill();
 
-          // Search through visible candles to find the one that matches the buy price
-          // This assumes the buy happened on one of the visible candles
-          for (let i = 0; i < visibleData.length; i++) {
-            const candlePrice = visibleData[i];
-            // Check if buy price is close to this candle's price (within tolerance)
-            if (Math.abs(candlePrice - buyPrice) < 0.01) {
-              buyIndex = i;
-              break;
-            }
-          }
+      // label
+      ctx.font = "bold 12px Inter";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, x, type === "buy" ? y + 10 : y - 20);
 
-          // If exact match not found, find the candle where price was closest
-          if (buyIndex === -1) {
-            let minDiff = Infinity;
-            for (let i = 0; i < visibleData.length; i++) {
-              const diff = Math.abs(visibleData[i] - buyPrice);
-              if (diff < minDiff) {
-                minDiff = diff;
-                buyIndex = i;
-              }
-            }
-          }
+      ctx.restore();
+    };
 
-          // Only draw if we found a valid candle index
-          if (buyIndex >= 0 && buyIndex < visibleData.length) {
-            const markerX =
-              LEFT_PADDING + buyIndex * (CANDLE_WIDTH + GAP) + CANDLE_WIDTH / 2;
-            const markerY = scaleY(buyPrice);
+    // Adding Marker
+    // --- draw trade markers for user trades ---
+    const trades = allUserTrades || [];
 
-            // Draw a circle marker
-            ctx.beginPath();
-            ctx.arc(markerX, markerY, 8, 0, Math.PI * 2);
-            ctx.fillStyle = "#3b82f6"; // Blue color
-            ctx.fill();
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 2;
-            ctx.stroke();
+    trades.forEach((trade: any) => {
+      const { buy, sell, userId } = trade;
+      // find approximate candle X position
+      const buyIndex = data.findIndex((d) => d >= buy);
+      const sellIndex = data.findIndex((d) => d >= sell);
+      const markerLabel = userId ? userId.toString().slice(0, 4) : "";
 
-            // Draw "BUY" label above the marker
-            ctx.font = "bold 12px Inter";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "bottom";
-            ctx.fillStyle = "#ffffff";
-            ctx.fillText("BUY", markerX, markerY - 12);
+      if (buy) {
+        const x =
+          LEFT_PADDING +
+          (buyIndex >= 0 ? buyIndex : visibleData.length - 1) *
+            (CANDLE_WIDTH + GAP) +
+          CANDLE_WIDTH / 2;
+        const y = scaleY(buy);
+        drawTradeMarker(ctx, x, y, "buy", markerLabel);
+      }
 
-            // Optional: Draw a horizontal line from buy point
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(LEFT_PADDING, markerY);
-            ctx.lineTo(width, markerY);
-            ctx.strokeStyle = "rgba(59, 130, 246, 0.4)"; // Semi-transparent blue
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Optional: Show price label
-            const buyLabel = `${buyPrice.toFixed(3)}x`;
-            ctx.font = "bold 14px Inter";
-            ctx.textAlign = "right";
-            ctx.textBaseline = "middle";
-            const labelWidth = ctx.measureText(buyLabel).width;
-            ctx.fillStyle = "rgba(59, 130, 246, 0.9)";
-            ctx.fillRect(
-              LEFT_PADDING - labelWidth - 18,
-              markerY - 12,
-              labelWidth + 12,
-              24
-            );
-            ctx.fillStyle = "#ffffff";
-            ctx.fillText(buyLabel, LEFT_PADDING - 10, markerY);
-          }
-        }
-      });
-    }
+      if (sell) {
+        const x =
+          LEFT_PADDING +
+          (sellIndex >= 0 ? sellIndex : visibleData.length) *
+            (CANDLE_WIDTH + GAP) +
+          CANDLE_WIDTH / 2;
+        const y = scaleY(sell);
+        drawTradeMarker(ctx, x, y, "sell", markerLabel);
+      }
+    });
 
     // Forming candle (animated growth from lastValue -> current)
     const formingX = LEFT_PADDING + visibleData.length * (CANDLE_WIDTH + GAP);
@@ -520,36 +491,38 @@ export default function Home() {
     localStorage.setItem("userId", "guest");
   }
 
+  useEffect(() => {}, [balance]);
+
   return (
     <div className="min-h-screen bg-[#1a1d29] flex flex-col items-start  p-2 w-full">
-      <div className="w-full max-w-[1500px] flex flex-col justify-end mx-auto lg:flex-row gap-2">
+      <div className="w-full max-w-[2200px] max-h-[1200px] flex flex-col justify-end mx-auto lg:flex-row gap-2">
+        <ChatSidebar />
         {/* Left: Chart */}
         <div className="flex-1">
-          <div className="mb-4 flex justify-between items-center">
-            <h1 className="text-white text-2xl font-bold">
-              Rug.fun (clone)
-              <div>
-                {latency !== null && (
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`text-sm font-semibold flex items-center gap-1 ${
-                        latency < 50
-                          ? "text-green-500"
-                          : latency < 100
-                          ? "text-yellow-500"
-                          : "text-red-500"
-                      }`}
-                    >
-                      {latency}ms <Wifi size={15} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </h1>
-            <div className=" bg-yellow-400 px-3 py-1 rounded-lg text-black font-bold font-mono">
+          <div className={`mb-4 flex ${"justify-between"} items-center w-full`}>
+            <div className="flex items-center gap-2">
+              {latency !== null && (
+                <div
+                  className={`text-sm font-semibold flex items-center gap-1 ${
+                    latency < 50
+                      ? "text-green-500"
+                      : latency < 100
+                      ? "text-yellow-500"
+                      : "text-red-500"
+                  }`}
+                >
+                  {latency}ms <Wifi size={15} />
+                </div>
+              )}
+            </div>
+            <div className=" bg-yellow-400 px-3 py-1 flex rounded-lg items-center gap-2 text-black font-bold font-mono">
               Balance:
               <span className="text-black font-bold font-mono">
                 {balance && (balance / 1000000000).toFixed(4)}
+              </span>
+              <span>
+                {" "}
+                <RefreshCcw size={18} onClick={() => refetch()} />{" "}
               </span>
             </div>
           </div>
@@ -565,6 +538,46 @@ export default function Home() {
               height={600}
               className="w-full"
             />
+          </div>
+          <BetStopLossControl
+            amount={internalAmount}
+            setAmount={setInternalAmount}
+          />
+          <div className="mt-4 flex gap-4 justify-center w-full max-w-[200px] mx-auto">
+            <Button
+              onClick={handleBuy}
+              disabled={
+                userId == "guest" ||
+                gameStateRef.current == "CRASHED" ||
+                gameStateRef.current == "WAITING"
+                  ? true
+                  : false || internalAmount == 0
+              }
+              className={`bg-green-600 hover:bg-green-700 h-10 text-xl w-full shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
+              style={{
+                textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
+                boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
+              }}
+            >
+              BUY
+            </Button>
+            <Button
+              onClick={handleSell}
+              disabled={
+                userId == "guest" ||
+                gameStateRef.current == "CRASHED" ||
+                gameStateRef.current == "WAITING"
+                  ? true
+                  : false || internalAmount == 0
+              }
+              className={`bg-red-600 hover:bg-red-700 h-10 w-full  text-xl shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
+              style={{
+                textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
+                boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
+              }}
+            >
+              SELL
+            </Button>
           </div>
         </div>
 
@@ -590,47 +603,7 @@ export default function Home() {
         </main>
       </div>
       <section className="flex flex-col items-start justify-start max-w-[2400px] mx-auto pr-64 gap-4">
-        <BetStopLossControl
-          amount={internalAmount}
-          setAmount={setInternalAmount}
-        />
         {/* Pay Button */}
-        <div className="mt-4 flex gap-4 justify-center w-full max-w-[300px] mx-auto">
-          <Button
-            onClick={handleBuy}
-            disabled={
-              userId == "guest" ||
-              gameStateRef.current == "CRASHED" ||
-              gameStateRef.current == "WAITING"
-                ? true
-                : false || internalAmount == 0
-            }
-            className={`bg-green-600 hover:bg-green-700 h-10 w-full shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
-            style={{
-              textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
-              boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
-            }}
-          >
-            BUY
-          </Button>
-          <Button
-            onClick={handleSell}
-            disabled={
-              userId == "guest" ||
-              gameStateRef.current == "CRASHED" ||
-              gameStateRef.current == "WAITING"
-                ? true
-                : false || internalAmount == 0
-            }
-            className={`bg-red-600 hover:bg-red-700 h-10 w-full shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
-            style={{
-              textShadow: "2px 2px 5px rgba(0,0,0,0.7)",
-              boxShadow: "0 5px 15px rgba(0,0,0,0.5)",
-            }}
-          >
-            SELL
-          </Button>
-        </div>
       </section>
     </div>
   );

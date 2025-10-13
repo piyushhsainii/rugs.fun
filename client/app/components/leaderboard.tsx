@@ -73,14 +73,14 @@ export function Leaderboard({
     <Card
       className={cn(
         "bg-[#0f0f10] border border-yellow-400/40 rounded-xl h-auto shadow-sm w-auto lg:w-[380px] text-white",
-        "transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-gray-700/40",
+        "transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-gray-700/40 ",
         className
       )}
       aria-label="Leaderboard and recent trades"
     >
       <div
         className={cn(
-          "flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-700"
+          "flex items-start justify-between px-5 pt-5 pb-4 border-b border-gray-700 "
         )}
       >
         <div className="flex items-center gap-3">
@@ -115,7 +115,7 @@ export function Leaderboard({
         {rows.length === 0 ? (
           <div
             className={cn(
-              "rounded-lg border border-dashed border-gray-700 p-6 text-center bg-gray-900"
+              "rounded-lg border border-dashed border-gray-700 p-6 text-center bg-gray-900 h-[250px]"
             )}
             role="status"
             aria-live="polite"
@@ -123,7 +123,7 @@ export function Leaderboard({
             <p className="text-sm text-gray-400">No trades to display.</p>
           </div>
         ) : (
-          <div className="rounded-lg border border-gray-700  h-[340px] overflow-auto custom-scrollbar ">
+          <div className="rounded-lg border border-gray-700  h-[250px] overflow-auto custom-scrollbar ">
             <div className="overflow-x-auto">
               <Table className="min-w-full">
                 <TableHeader className="bg-gray-800/50">

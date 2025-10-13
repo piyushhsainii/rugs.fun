@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AppProvider from "./AppProvider";
 import Navbar from "./components/navbar";
+import { Toaster } from "sonner";
 require("@solana/wallet-adapter-react-ui/styles.css");
 
 const geistSans = Geist({
@@ -33,6 +34,7 @@ export default function RootLayout({
         <AppProvider>
           <Navbar />
           {children}
+          <Toaster />
         </AppProvider>
       </body>
     </html>

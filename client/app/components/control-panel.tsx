@@ -133,7 +133,7 @@ export function BetStopLossControl({
   return (
     <div
       className={cn(
-        "bg-black/80 text-white border border-yellow-500/30 rounded-2xl p-4 md:p-5 flex flex-col gap-4 transition-all",
+        "bg-black/80 text-white border border-yellow-300/30 rounded-2xl p-4 md:p-5 flex flex-col gap-4 transition-all",
         "shadow-[0_0_15px_rgba(255,255,0,0.2)] hover:shadow-[0_0_25px_rgba(255,255,0,0.3)] my-5",
         "md:flex-row md:items-stretch md:gap-6",
         className
@@ -141,7 +141,7 @@ export function BetStopLossControl({
     >
       {/* Left: Amount input + balance */}
       <div className="md:flex-1 ">
-        <InputGroup className="h-12 md:h-14 flex flex-wrap md:flex-nowrap">
+        <InputGroup className="h-12 md:h-14 flex flex-wrap md:flex-nowrap border border-yellow-300/30">
           {/* Amount field */}
           <div className="flex-1 min-w-[200px]">
             <input
@@ -154,7 +154,7 @@ export function BetStopLossControl({
               aria-label="Bet amount"
               className={cn(
                 "w-full font-mono text-lg md:text-2xl text-yellow-300 px-3 py-2 text-right rounded-md outline-none",
-                "bg-white/10 border border-white/20 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/50",
+                "bg-white/10  focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/50",
                 "placeholder:text-white/40"
               )}
               placeholder="0.0000"

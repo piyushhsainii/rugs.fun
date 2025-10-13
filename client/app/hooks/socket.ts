@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useUserInformation } from "./userInfo";
 
 export default function useGameWebSocket() {
   const userId = localStorage.getItem("userId");
@@ -6,6 +7,7 @@ export default function useGameWebSocket() {
   const [gameState, setGameState] = useState<"WAITING" | "ACTIVE" | "CRASHED">(
     "WAITING"
   );
+  const { balance, setBalance } = useUserInformation();
   const [clientsConnected, setClientsConnected] = useState(0);
   const [allUserTrades, setAllUserTrades] = useState<
     { userId: string; trades: any[] }[]
@@ -25,6 +27,12 @@ export default function useGameWebSocket() {
     },
   ]);
   const [previousGames, setPreviousGames] = useState<any[]>([]);
+  const [globalChats, setGlobalChats] = useState<
+    {
+      username: string;
+      message: string;
+    }[]
+  >([]);
   const [history, setHistory] = useState<number[]>([]);
   const [latency, setLatency] = useState<number | null>(null);
   const [timer, setTimer] = useState(0);
@@ -50,34 +58,30 @@ export default function useGameWebSocket() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-
         const message = JSON.parse(event.data);
 
         if (message.type === "PING") {
-          console.log(`Received PING`, message);
           ws.send(
             JSON.stringify({
               type: "PONG",
               serverTimestamp: message.serverTimestamp,
             })
           );
-          console.log(`Sending PONG`);
         }
 
+        if (message.type === "global-chat") {
+          console.log("loading chats", message.chats);
+          setGlobalChats(message.chats);
+        }
         if (message.type === "LATENCY_UPDATE") {
-          console.log(`Latency update in`, message);
           setLatency(message.latency);
         }
-
         // 🟢 Connected clients count
         if (data.type === "client-count") {
-          console.log("Connected clients:", data.count);
           setClientsConnected(data.count);
         }
-
         // 🔁 Restore user trades on reconnect
         if (data.type === "trade-restore" && data.userId === userId) {
-          console.log("Trade restored:", data.trades);
           setAllUserTrades((prev) => {
             const existing = prev.find((u) => u.userId === data.userId);
             if (existing) {
@@ -98,12 +102,16 @@ export default function useGameWebSocket() {
 
         // 🧭 Handle initial game state
         if (data.type === "init") {
-          console.log("INIT:", data);
           setGameState(data.state);
           setPreviousGames(data.previousGames || []);
           historyRef.current =
             data.currentGameTicks?.map((t: any) => t.value) || [];
           setHistory([...historyRef.current]);
+        }
+
+        // Load in global chats..
+
+        if (data.type === "global-chat") {
         }
 
         // 📈 Handle tick updates
@@ -136,7 +144,7 @@ export default function useGameWebSocket() {
 
         // 💹 Handle trade updates from server
         if (data.type === "trade-update") {
-          const { userId, trades } = data;
+          const { userId, trades, new_balance } = data;
           setAllUserTrades((prev) => {
             const exists = prev.find((u) => u.userId === userId);
             if (exists) {
@@ -147,6 +155,7 @@ export default function useGameWebSocket() {
               return [...prev, { userId, trades }];
             }
           });
+          setBalance(new_balance);
         }
         if (data.type === "prev-game") {
           setPreviousGames(data.data);
@@ -171,8 +180,6 @@ export default function useGameWebSocket() {
     };
   }, [userId]);
 
-  console.log(latency, "latency");
-
   return {
     gameState,
     history,
@@ -185,6 +192,8 @@ export default function useGameWebSocket() {
     timer,
     userId,
     latency,
+    globalChats,
+    setGlobalChats,
     setGameState,
   };
 }

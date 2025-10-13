@@ -42,6 +42,15 @@ let users: User[] = [];
 let currentGameTicks: GameTick[] = [];
 let previousGames: GameHistory[] = []; // holds last 10 games only
 let userTrades: Trade[] = [];
+let globalChats: {
+  username: string;
+  message: string;
+}[] = [
+  {
+    username: "System",
+    message: "Welcome to the global chat. Be respectful and have fun!",
+  },
+];
 
 // --- Broadcast Helper ---
 const broadcast = (data: any) => {
@@ -77,7 +86,6 @@ const startGame = () => {
 
         if (res.error) {
           console.error("ERROR INSERTING GAME:", res);
-          console.error("Error details:", JSON.stringify(res.error, null, 2));
         } else {
           console.log("✅ Successfully inserted Game ID:", gameId);
           console.log("Insert data:", res.data);
@@ -176,6 +184,11 @@ const startGame = () => {
 wss.on("connection", (ws) => {
   console.log("🟢 New client connected");
 
+  broadcast({
+    type: "global-chat",
+    chats: globalChats,
+  });
+
   setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
       console.log(`Sending PING`);
@@ -212,7 +225,6 @@ wss.on("connection", (ws) => {
       const data = JSON.parse(message.toString());
 
       if (data.type === "PONG") {
-        console.log(`Received PONG`);
         const rtt = Date.now() - data.serverTimestamp;
         const latency = Math.round(rtt / 2);
 
@@ -222,6 +234,17 @@ wss.on("connection", (ws) => {
             latency,
           })
         );
+      }
+
+      if (data.type === "global-chat") {
+        globalChats.push({
+          username: data.chats.username,
+          message: data.chats.message,
+        });
+        broadcast({
+          type: "global-chat",
+          chats: globalChats,
+        });
       }
 
       // --- Identify / Reconnect user ---
@@ -277,10 +300,6 @@ wss.on("connection", (ws) => {
             if (error) console.error(error);
             else {
               console.log("✅ Buy trade result:", data);
-              console.log("Trade ID:", data.trade_id);
-              console.log("Old balance:", data.old_balance);
-              console.log("New balance:", data.new_balance);
-              console.log("Amount deducted:", data.amount_deducted);
               user.trades.push(trade);
               // global trades array
               userTrades.push(trade);
@@ -288,6 +307,7 @@ wss.on("connection", (ws) => {
                 type: "trade-update",
                 userId: user.userId,
                 trades: user.trades,
+                new_balance: data.new_balance,
               });
             }
           });
@@ -347,6 +367,7 @@ wss.on("connection", (ws) => {
               type: "trade-update",
               userId: user.userId,
               trades: user.trades,
+              new_balance: data.new_balance,
             });
 
             // Broadcast all trades update to everyone
