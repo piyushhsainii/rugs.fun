@@ -25,6 +25,7 @@
     "@solana/wallet-adapter-wallets": "^0.19.37",
     "@solana/web3.js": "^1.98.4",
     "@supabase/ssr": "^0.7.0",
+    "@vercel/analytics": "^1.5.0",
     "assert": "^2.1.0",
     "browserify-zlib": "^0.2.0",
     "class-variance-authority": "^0.7.1",
