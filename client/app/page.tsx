@@ -9,11 +9,14 @@ import SummaryPrevGames from "./components/summary-data";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useUserInformation } from "./hooks/userInfo";
 import BetStopLossControl from "./components/control-panel";
-import { RefreshCcw, Wifi } from "lucide-react";
+import { Menu, RefreshCcw, Send, Wifi } from "lucide-react";
 import { ChatSidebar } from "./components/chat-sidebar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const [internalAmount, setInternalAmount] = useState<number>(0);
   const [autoSellAmount, setAutoSellAmount] = useState<number | null>(null);
   // constants
@@ -136,12 +139,14 @@ export default function Home() {
   const drawChart = useCallback(() => {
     // console.log("draw");
     const canvas = canvasRef.current;
+    const container = containerRef.current;
     if (!canvas) return;
+    if (!canvas || !container) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const width = canvas.width;
-    const height = canvas.height;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
 
     // Advance animated multiplier toward target (smooth)
     animatedMultiplierRef.current +=
@@ -518,16 +523,60 @@ export default function Home() {
 
   useEffect(() => {}, [balance]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+
+    if (!canvas || !container) return;
+
+    const updateCanvasSize = () => {
+      // Get the actual display size of the canvas
+      const rect = container.getBoundingClientRect();
+
+      // Set the canvas internal resolution
+      // Use devicePixelRatio for sharp rendering on high-DPI displays
+      const dpr = window.devicePixelRatio || 1;
+
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+
+      // Scale the canvas context to match the device pixel ratio
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+      }
+
+      // Redraw your canvas content here after resizing
+      // For example: drawChart();
+    };
+
+    // Initial size
+    updateCanvasSize();
+
+    // Create ResizeObserver to watch for container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      updateCanvasSize();
+    });
+
+    resizeObserver.observe(container);
+
+    // Cleanup
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
   return (
     <div className="min-h-screen bg-[#1a1d29] flex flex-col items-start  p-2 w-full">
-      <div className="w-full max-w-[2200px] max-h-[1200px] flex flex-col justify-end mx-auto lg:flex-row gap-2">
-        <ChatSidebar
-          globalChats={globalChats}
-          setGlobalChats={setGlobalChats}
-          wsRef={wsRef}
-        />
+      <div className="w-full max-w-[1800px]  flex flex-col justify-end mx-auto  2xl:flex-row   gap-2">
+        <div className="hidden 2xl:block">
+          <ChatSidebar
+            globalChats={globalChats}
+            setGlobalChats={setGlobalChats}
+            wsRef={wsRef}
+          />
+        </div>
         {/* Left: Chart */}
-        <div className="flex-1">
+        <div className="">
           <div className={`mb-4 flex ${"justify-between"} items-center w-full`}>
             <div className="flex items-center gap-2">
               {latency !== null && (
@@ -557,17 +606,36 @@ export default function Home() {
               </div>
             )}
           </div>
-          <div className="text-white flex items-center my-1 w-full">
+          <div className="text-white flex items-center my-1 w-full gap-3">
             {" "}
             <span className="inline-block w-2 h-2 bg-green-600 rounded-full m-1"></span>
             <Label htmlFor="">{clientsConnected} users online</Label>
+            <Sheet>
+              <SheetTrigger>
+                <div className="flex items-center bg-yellow-300/50 rounded-full px-4 py-1 font-semibold border-2 border-black gap-3 2xl:hidden  cursor-pointer">
+                  <div className="text-xs"> Open Chat</div>{" "}
+                  <Send size={15} color="yellow" />
+                </div>
+              </SheetTrigger>
+              <SheetContent>
+                <ChatSidebar
+                  globalChats={globalChats}
+                  setGlobalChats={setGlobalChats}
+                  wsRef={wsRef}
+                />
+              </SheetContent>
+            </Sheet>
           </div>
-          <div className="bg-[#0f1118] rounded-lg p-4 relative">
+
+          <div
+            ref={containerRef}
+            className="bg-[#0f1118] rounded-lg p-4 relative w-full max-h-[800px]"
+            style={{ height: "60vh" }} // You can adjust this to any viewport percentage
+          >
             <canvas
               ref={canvasRef}
-              width={1300}
-              height={600}
-              className="w-full"
+              className="w-full h-full  "
+              style={{ display: "block" }}
             />
           </div>
           <BetStopLossControl
@@ -618,7 +686,7 @@ export default function Home() {
         </div>
 
         {/* Right: Leaderboard */}
-        <main className="p-6 md:p-10 flex flex-col">
+        <div className="p-6 md:p-10 flex flex-col items-center gap-4">
           <div className=" mx-auto">
             <header className="mb-6">
               <h1 className="text-2xl font-semibold text-yellow-500 text-pretty font-mono">
@@ -636,7 +704,7 @@ export default function Home() {
               <SummaryPrevGames gameData={previousGames} />
             </div>
           )}
-        </main>
+        </div>
       </div>
     </div>
   );

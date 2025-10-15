@@ -124,70 +124,76 @@ export function BetStopLossControl({
   return (
     <div
       className={cn(
-        "bg-black/80 text-white border border-yellow-300/30 rounded-2xl p-4 md:p-5 flex flex-col gap-4 transition-all",
-        "shadow-[0_0_15px_rgba(255,255,0,0.2)] hover:shadow-[0_0_25px_rgba(255,255,0,0.3)] my-5",
-        "md:flex-row md:items-stretch md:gap-6",
+        "bg-black/80 text-white border border-yellow-300/30 rounded-2xl p-4 md:p-5 flex flex-col gap-10 transition-all",
+        "shadow-[0_0_15px_rgba(255,255,0,0.2)] hover:shadow-[0_0_25px_rgba(255,255,0,0.3)] my-5 w-[85%] xl:w-[100%] mx-auto",
+        "xl:flex-row md:items-stretch md:gap-10",
         className
       )}
     >
       {/* Left: Amount input + balance */}
-      <div className="md:flex-1 ">
-        <InputGroup className="h-12 md:h-14 flex flex-wrap md:flex-nowrap border border-yellow-300/30">
-          {/* Amount field */}
-          <div className="flex-1 min-w-[200px]">
-            <input
-              inputMode="decimal"
-              type="number"
-              step="0.0001"
-              min="0"
-              value={amt}
-              onChange={(e) => handleAmountInput(e.target.value)}
-              aria-label="Bet amount"
-              className={cn(
-                "w-full font-mono text-lg md:text-2xl text-yellow-300 px-3 py-2 text-right rounded-md outline-none",
-                "bg-white/10  focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/50",
-                "placeholder:text-white/40"
-              )}
-              placeholder="0.0000"
-            />
-          </div>
-
-          {/* Presets */}
-          <InputGroupAddon align="inline-end" className="flex gap-1.5 shrink-0">
-            <InputGroupButton
-              size="xs"
-              variant="ghost"
-              onClick={() => applyPreset("X")}
-              className="text-white/80 hover:bg-yellow-500/20"
-            >
-              ×
-            </InputGroupButton>
-
-            {amountPresets.map((p) => (
+      <div className="flex-1  px-3 py-3">
+        <div className="flex flex-col w-full gap-2 focus:ring-2 focus:ring-yellow-400/50">
+          <InputGroup className="h-12 md:h-14 flex flex-col gap-2 border border-yellow-300/30">
+            {/* Amount field */}
+            <div className="flex-1 flex gap-2 items-center w-full">
+              <input
+                inputMode="decimal"
+                type="number"
+                step="0.0001"
+                min="0"
+                value={amt}
+                onChange={(e) => handleAmountInput(e.target.value)}
+                aria-label="Bet amount"
+                className={cn(
+                  "w-full font-mono text-lg md:text-2xl text-yellow-300 px-3 py-2 text-right rounded-md outline-none",
+                  "bg-white/10  focus:border-yellow-400 ",
+                  "placeholder:text-white/40"
+                )}
+                placeholder="0.0000"
+              />
               <InputGroupButton
-                key={String(p)}
                 size="xs"
-                variant="outline"
-                className="text-yellow-300 border-yellow-500/30 hover:bg-yellow-400/20"
-                onClick={() => applyPreset(p)}
+                variant="ghost"
+                onClick={() => applyPreset("X")}
+                className="text-white/80 hover:bg-yellow-500/20"
               >
-                {p}
+                ×
               </InputGroupButton>
-            ))}
+            </div>
 
-            {/* Balance pill */}
-            <InputGroupText className="ml-1 flex items-center gap-1 bg-white/10 border border-yellow-500/30 rounded-md px-2 py-1">
-              <span className="text-gray-300">Bal</span>
-              <span className="font-mono text-yellow-300">
-                {balance ? Number((balance / LAMPORTS_PER_SOL).toFixed(4)) : 0}
-              </span>
-            </InputGroupText>
-          </InputGroupAddon>
-        </InputGroup>
+            {/* Presets */}
+            <InputGroupAddon
+              align="inline-end"
+              className="flex gap-1.5 shrink-0 w-full"
+            >
+              {amountPresets.map((p) => (
+                <InputGroupButton
+                  key={String(p)}
+                  size="xs"
+                  variant="outline"
+                  className="text-yellow-300 border-yellow-500/30 hover:bg-yellow-400/20"
+                  onClick={() => applyPreset(p)}
+                >
+                  {p}
+                </InputGroupButton>
+              ))}
+
+              {/* Balance pill */}
+              <InputGroupText className="ml-1 flex items-center gap-1 bg-white/10 border border-yellow-500/30 rounded-md px-2 py-1">
+                <span className="text-gray-300">Bal</span>
+                <span className="font-mono text-yellow-300">
+                  {balance
+                    ? Number((balance / LAMPORTS_PER_SOL).toFixed(4))
+                    : 0}
+                </span>
+              </InputGroupText>
+            </InputGroupAddon>
+          </InputGroup>
+        </div>
       </div>
 
       {/* Right: Stop-loss section */}
-      <div className="md:flex-1">
+      <div className="">
         <div
           className={cn(
             "border border-yellow-500/30 rounded-xl px-3 py-3 md:px-4 md:py-3",
@@ -219,7 +225,7 @@ export function BetStopLossControl({
             </ButtonGroup>
 
             {/* Auto Sell */}
-            <div className="flex-1 min-w-[200px]">
+            <div className="flex-1">
               <input
                 inputMode="decimal"
                 type="number"

@@ -70,27 +70,13 @@ export function ChatSidebar({
 
   return (
     <>
-      {/* Mobile toggle */}
-      <button
-        type="button"
-        aria-label={open ? "Close global chat" : "Open global chat"}
-        className={cn(
-          "fixed left-3 top-3 z-[60] rounded-md px-3 py-2 text-sm font-medium",
-          "bg-amber-400 text-white shadow",
-          "md:hidden"
-        )}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {open ? "Close Chat" : "Chat"}
-      </button>
-
       {/* Sidebar */}
       <div
         className={cn(
           "max-h-[800px] inset-y-0 left-0",
-          "w-[280px] md:w-[320px] transition-transform duration-200",
+          "w-full  transition-transform duration-200",
           open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-          "bg-chat-bg border-r border-yellow-400/40"
+          "bg-chat-bg border-r border-yellow-400/40 "
         )}
         role="complementary"
         aria-label="Global chat"
@@ -108,7 +94,7 @@ export function ChatSidebar({
         </header>
 
         {/* Messages */}
-        <ScrollArea className="h-[calc(100vh-250px)] max-h-[1500px]">
+        <ScrollArea className="h-[calc(100vh-250px)] max-h-[1500px] w-full">
           <div className="flex flex-col gap-3 p-3" aria-live="polite">
             {globalChats.map((m, idx) => (
               <div
