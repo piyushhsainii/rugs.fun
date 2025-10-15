@@ -2,12 +2,6 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupText,
-} from "@/components/ui/input-group";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";

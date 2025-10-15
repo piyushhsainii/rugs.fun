@@ -571,7 +571,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#1a1d29] flex flex-col items-start  p-2 w-full">
-      <div className="w-full max-w-[1800px]  flex flex-col justify-end mx-auto  2xl:flex-row   gap-2">
+      <div className="w-full max-w-[1800px]  flex flex-col justify-end mx-auto  2xl:flex-row gap-2">
         <div className="hidden 2xl:block">
           <ChatSidebar
             globalChats={globalChats}
