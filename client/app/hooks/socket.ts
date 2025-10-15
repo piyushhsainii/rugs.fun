@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useUserInformation } from "./userInfo";
 
 export default function useGameWebSocket() {
-  const userId = localStorage.getItem("userId");
+  const [userId, setUserId] = useState<string | null>(null);
 
   const [gameState, setGameState] = useState<"WAITING" | "ACTIVE" | "CRASHED">(
     "WAITING"
@@ -51,6 +51,12 @@ export default function useGameWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const historyRef = useRef<number[]>([]);
   const targetMultiplierRef = useRef<number>(1.0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return; // server-safe
+    const storedId = localStorage.getItem("userId") || "guest";
+    setUserId(storedId);
+  }, []);
 
   // --------------------------------------------------
   // 🧩 WebSocket Connection

@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 import { Label } from "@/components/ui/label";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useEffect, useRef, useState } from "react";
