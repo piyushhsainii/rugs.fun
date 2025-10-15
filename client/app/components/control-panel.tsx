@@ -133,7 +133,7 @@ export function BetStopLossControl({
       {/* Left: Amount input + balance */}
       <div className="flex-1  px-3 py-3">
         <div className="flex flex-col w-full gap-2 focus:ring-2 focus:ring-yellow-400/50">
-          <InputGroup className="h-12 md:h-14 flex flex-col gap-2 border border-yellow-300/30">
+          <div className="h-12 md:h-14 flex flex-col gap-2 border border-yellow-300/30">
             {/* Amount field */}
             <div className="flex-1 flex gap-2 items-center w-full">
               <input
@@ -151,44 +151,42 @@ export function BetStopLossControl({
                 )}
                 placeholder="0.0000"
               />
-              <InputGroupButton
-                size="xs"
-                variant="ghost"
+              <div
                 onClick={() => applyPreset("X")}
                 className="text-white/80 hover:bg-yellow-500/20"
               >
                 ×
-              </InputGroupButton>
+              </div>
             </div>
 
             {/* Presets */}
-            <InputGroupAddon
-              align="inline-end"
-              className="flex gap-1.5 shrink-0 w-full"
+            <div
+              // align="inline-end"
+              className="flex gap-1.5 shrink-0 w-full items-center"
             >
               {amountPresets.map((p) => (
-                <InputGroupButton
+                <div
                   key={String(p)}
-                  size="xs"
-                  variant="outline"
-                  className="text-yellow-300 border-yellow-500/30 hover:bg-yellow-400/20"
+                  // size="xs"
+                  // variant="outline"
+                  className="text-yellow-300 border-yellow-500/30 hover:bg-yellow-400/20 px-2 rounded-full cursor-pointer"
                   onClick={() => applyPreset(p)}
                 >
                   {p}
-                </InputGroupButton>
+                </div>
               ))}
 
               {/* Balance pill */}
-              <InputGroupText className="ml-1 flex items-center gap-1 bg-white/10 border border-yellow-500/30 rounded-md px-2 py-1">
+              <div className="ml-1 flex items-center gap-1 bg-white/10 border border-yellow-500/30 rounded-md px-2 py-1">
                 <span className="text-gray-300">Bal</span>
                 <span className="font-mono text-yellow-300">
                   {balance
                     ? Number((balance / LAMPORTS_PER_SOL).toFixed(4))
                     : 0}
                 </span>
-              </InputGroupText>
-            </InputGroupAddon>
-          </InputGroup>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

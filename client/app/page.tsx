@@ -515,12 +515,15 @@ export default function Home() {
     };
   }, []);
 
-  if (wallet && wallet.publicKey) {
-    localStorage.setItem("userId", wallet.publicKey.toBase58());
-  } else {
-    localStorage.setItem("userId", "guest");
-  }
+  useEffect(() => {
+    if (typeof window === "undefined") return; // ensure browser only
 
+    if (wallet && wallet.publicKey) {
+      localStorage.setItem("userId", wallet.publicKey.toBase58());
+    } else {
+      localStorage.setItem("userId", "guest");
+    }
+  }, [wallet]); // runs when wallet changes
   useEffect(() => {}, [balance]);
 
   useEffect(() => {
@@ -565,6 +568,7 @@ export default function Home() {
       resizeObserver.disconnect();
     };
   }, []);
+
   return (
     <div className="min-h-screen bg-[#1a1d29] flex flex-col items-start  p-2 w-full">
       <div className="w-full max-w-[1800px]  flex flex-col justify-end mx-auto  2xl:flex-row   gap-2">

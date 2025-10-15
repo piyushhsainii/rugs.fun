@@ -23,20 +23,20 @@ export default function useGameWebSocket() {
       }[];
     }[]
   >([
-    {
-      userId: "5NHvrqoZk4ov5GvKzDpsmEeW4URwLuG6P4HrmSDTqHc7",
-      trades: [
-        {
-          id: 123,
-          key: "",
-          userId: "",
-          tradeId: "123",
-          buy: 1.2,
-          sell: 2.4,
-          pnl: 2,
-        },
-      ],
-    },
+    // {
+    //   userId: "5NHvrqoZk4ov5GvKzDpsmEeW4URwLuG6P4HrmSDTqHc7",
+    //   trades: [
+    //     {
+    //       id: 123,
+    //       key: "",
+    //       userId: "",
+    //       tradeId: "123",
+    //       buy: 1.2,
+    //       sell: 2.4,
+    //       pnl: 2,
+    //     },
+    //   ],
+    // },
   ]);
   const [previousGames, setPreviousGames] = useState<any[]>([]);
   const [globalChats, setGlobalChats] = useState<
