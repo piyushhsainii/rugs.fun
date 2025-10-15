@@ -57,14 +57,14 @@ export default function useGameWebSocket() {
     const storedId = localStorage.getItem("userId") || "guest";
     setUserId(storedId);
   }, []);
-
+  const url = process.env.NEXT_PUBLIC_BACKEND_URL ?? "ws://localhost:8080";
   // --------------------------------------------------
   // 🧩 WebSocket Connection
   // --------------------------------------------------
   useEffect(() => {
     if (!userId) return;
 
-    const ws = new WebSocket("ws://localhost:8080");
+    const ws = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {

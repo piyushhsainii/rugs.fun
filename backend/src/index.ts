@@ -391,4 +391,8 @@ wss.on("connection", (ws) => {
 // --- Start first game ---
 startGame();
 
-console.log("✅ WebSocket server running on ws://localhost:8080");
+console.log(
+  `✅ WebSocket server running on ${
+    process.env.CLIENT_URL ?? "ws://localhost:8080"
+  } `
+);
