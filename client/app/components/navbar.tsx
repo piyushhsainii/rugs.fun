@@ -201,7 +201,7 @@ const Navbar = () => {
       className={`
     sticky top-0 z-50
     w-full flex justify-around items-center text-white
-    backdrop-blur-md bg-black/30
+    backdrop-blur-lg bg-black/40
     border-b border-yellow-400/20
     shadow-[0_4px_15px_rgba(255,215,0,0.2)]
     transition-all duration-300 py-3
@@ -215,7 +215,12 @@ const Navbar = () => {
     >
       <div>
         <Link href={"/"}>
-          <div
+          <img
+            src="https://apneajyhbpncbciasirk.supabase.co/storage/v1/object/public/nft-storage/rugs-fun/rugs-fun-logo-cropped-png.png"
+            alt=""
+            className="h-12 w-auto"
+          />
+          {/* <div
             className="font-extrabold text-4xl cursor-pointer"
             style={{
               textShadow: `
@@ -232,7 +237,7 @@ const Navbar = () => {
             }}
           >
             Rugs.fun
-          </div>
+          </div> */}
         </Link>
       </div>
 

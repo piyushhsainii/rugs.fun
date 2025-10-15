@@ -7,15 +7,27 @@ export default function useGameWebSocket() {
   const [gameState, setGameState] = useState<"WAITING" | "ACTIVE" | "CRASHED">(
     "WAITING"
   );
-  const { balance, setBalance } = useUserInformation();
+  const { balance, setBalance, refetch } = useUserInformation();
   const [clientsConnected, setClientsConnected] = useState(0);
   const [allUserTrades, setAllUserTrades] = useState<
-    { userId: string; trades: any[] }[]
+    {
+      userId: string;
+      trades: {
+        id: number;
+        key: String;
+        userId: String;
+        tradeId: String;
+        buy: number;
+        sell: number | null;
+        pnl: number | null;
+      }[];
+    }[]
   >([
     {
-      userId: "213",
+      userId: "5NHvrqoZk4ov5GvKzDpsmEeW4URwLuG6P4HrmSDTqHc7",
       trades: [
         {
+          id: 123,
           key: "",
           userId: "",
           tradeId: "123",
@@ -125,8 +137,11 @@ export default function useGameWebSocket() {
           ].slice(-1000);
           setHistory([...historyRef.current]);
           if (state === "CRASHED") {
+            targetMultiplierRef.current = Number(0);
             setGameState("CRASHED");
+            refetch();
           } else if (state === "WAITING") {
+            targetMultiplierRef.current = Number(0);
             setGameState("WAITING");
             setTimer(data.timer);
             setHistory([]);

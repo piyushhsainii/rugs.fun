@@ -15,7 +15,7 @@ import { ChatSidebar } from "./components/chat-sidebar";
 export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [internalAmount, setInternalAmount] = useState<number>(0);
-
+  const [autoSellAmount, setAutoSellAmount] = useState<number | null>(null);
   // constants
   const CANDLE_WIDTH = 30;
   const GAP = 6;
@@ -38,9 +38,12 @@ export default function Home() {
     clientsConnected,
     wsRef,
     latency,
+    globalChats,
+    setGlobalChats,
   } = useGameWebSocket();
 
-  const { balance, setBalance, refetch } = useUserInformation();
+  const { balance, setBalance, refetch, isApplied, setisApplied } =
+    useUserInformation();
 
   // store gameState in a ref that updates each render
   const gameStateRef = useRef(gameState);
@@ -72,16 +75,38 @@ export default function Home() {
     setBalance((prevBal) =>
       prevBal ? prevBal - internalAmount : internalAmount
     );
+    refetch();
   };
-
   const handleSell = () => {
     const userId = wallet.publicKey;
-
     const sellPrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
     wsRef.current?.send(
       JSON.stringify({ type: "sell", userId, sell: sellPrice })
     );
+    console.log(`Sold at: ${sellPrice}`);
+    refetch();
   };
+  // Handling Auto Sell
+  useEffect(() => {
+    const autoSell = async () => {
+      const myTrades = allUserTrades.find((data) => data.userId == userId);
+      const sellPrice = parseFloat(animatedMultiplierRef.current.toFixed(4));
+      if (
+        isApplied &&
+        autoSellAmount &&
+        targetMultiplierRef.current >= autoSellAmount &&
+        myTrades?.trades.find((dt) => dt.buy !== 0 && !dt.sell) &&
+        wallet.publicKey
+      ) {
+        wsRef.current?.send(
+          JSON.stringify({ type: "sell", userId, sell: sellPrice })
+        );
+        console.log(`Auto Sold at: ${sellPrice}`);
+        refetch();
+      }
+    };
+    autoSell();
+  }, [targetMultiplierRef.current]);
 
   // helper: rounded rect (cross-browser)
   const drawRoundedRect = (
@@ -496,7 +521,11 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#1a1d29] flex flex-col items-start  p-2 w-full">
       <div className="w-full max-w-[2200px] max-h-[1200px] flex flex-col justify-end mx-auto lg:flex-row gap-2">
-        <ChatSidebar />
+        <ChatSidebar
+          globalChats={globalChats}
+          setGlobalChats={setGlobalChats}
+          wsRef={wsRef}
+        />
         {/* Left: Chart */}
         <div className="flex-1">
           <div className={`mb-4 flex ${"justify-between"} items-center w-full`}>
@@ -515,16 +544,18 @@ export default function Home() {
                 </div>
               )}
             </div>
-            <div className=" bg-yellow-400 px-3 py-1 flex rounded-lg items-center gap-2 text-black font-bold font-mono">
-              Balance:
-              <span className="text-black font-bold font-mono">
-                {balance && (balance / 1000000000).toFixed(4)}
-              </span>
-              <span>
-                {" "}
-                <RefreshCcw size={18} onClick={() => refetch()} />{" "}
-              </span>
-            </div>
+            {wallet.publicKey && (
+              <div className=" bg-yellow-400 px-3 py-1 flex rounded-lg items-center gap-2 text-black font-bold font-mono">
+                Balance:
+                <span className="text-black font-bold font-mono">
+                  {balance && (balance / 1000000000).toFixed(4)}
+                </span>
+                <span>
+                  {" "}
+                  <RefreshCcw size={18} onClick={() => refetch()} />{" "}
+                </span>
+              </div>
+            )}
           </div>
           <div className="text-white flex items-center my-1 w-full">
             {" "}
@@ -542,6 +573,11 @@ export default function Home() {
           <BetStopLossControl
             amount={internalAmount}
             setAmount={setInternalAmount}
+            balance={balance ?? 0}
+            setAutoSellAmount={setAutoSellAmount}
+            autosell={autoSellAmount}
+            isApplied={isApplied}
+            setisApplied={setisApplied}
           />
           <div className="mt-4 flex gap-4 justify-center w-full max-w-[200px] mx-auto">
             <Button
@@ -602,9 +638,6 @@ export default function Home() {
           )}
         </main>
       </div>
-      <section className="flex flex-col items-start justify-start max-w-[2400px] mx-auto pr-64 gap-4">
-        {/* Pay Button */}
-      </section>
     </div>
   );
 }

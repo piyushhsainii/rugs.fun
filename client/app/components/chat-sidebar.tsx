@@ -1,14 +1,13 @@
 "use client";
 
 import type React from "react";
-
-import { useState, useRef } from "react";
+import { useState, useRef, RefObject, SetStateAction, Dispatch } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import useGameWebSocket from "../hooks/socket";
 import { useUserInformation } from "../hooks/userInfo";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 type ChatMessage = {
   username: string;
@@ -16,12 +15,29 @@ type ChatMessage = {
   self: boolean;
 };
 
-export function ChatSidebar() {
+export function ChatSidebar({
+  wsRef,
+  globalChats,
+  setGlobalChats,
+}: {
+  wsRef: RefObject<WebSocket | null>;
+  globalChats: {
+    username: string;
+    message: string;
+  }[];
+  setGlobalChats: Dispatch<
+    SetStateAction<
+      {
+        username: string;
+        message: string;
+      }[]
+    >
+  >;
+}) {
   const [open, setOpen] = useState(true);
   const [text, setText] = useState("");
-  const { userId, wsRef, globalChats, setGlobalChats } = useGameWebSocket();
   const { userName } = useUserInformation();
-
+  const { publicKey } = useWallet();
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleSend() {
@@ -50,6 +66,8 @@ export function ChatSidebar() {
     }
   }
 
+  const disabled = userName === "guest" || !publicKey;
+
   return (
     <>
       {/* Mobile toggle */}
@@ -69,7 +87,7 @@ export function ChatSidebar() {
       {/* Sidebar */}
       <div
         className={cn(
-          "max-h-[800px] inset-y-0 left-0 z-50",
+          "max-h-[800px] inset-y-0 left-0",
           "w-[280px] md:w-[320px] transition-transform duration-200",
           open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           "bg-chat-bg border-r border-yellow-400/40"
@@ -108,17 +126,15 @@ export function ChatSidebar() {
                       : "bg-black text-yellow-400 font-semibold"
                   )}
                 >
-                  {
-                    <div
-                      className={`mb-1 text-xs font-medium ${
-                        userName == m.username
-                          ? "text-black bg-gray-700/30 px-2 py-1"
-                          : "text-white"
-                      } rounded-full`}
-                    >
-                      {m.username}
-                    </div>
-                  }
+                  <div
+                    className={`mb-1 text-xs font-medium ${
+                      userName == m.username
+                        ? "text-black bg-gray-700/30 px-2 py-1"
+                        : "text-white"
+                    } rounded-full`}
+                  >
+                    {m.username}
+                  </div>
                   <p className="whitespace-pre-wrap break-words">{m.message}</p>
                 </div>
               </div>
@@ -128,24 +144,48 @@ export function ChatSidebar() {
 
         {/* Composer */}
         <div className="border-t border-yellow-400/40 p-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
             <Input
               ref={inputRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
+              disabled={disabled}
               placeholder="Type your message..."
               aria-label="Message input"
               className="bg-black text-yellow-400 font-semibold border border-yellow-400/40"
             />
+
             <Button
               type="button"
+              disabled={disabled}
               onClick={handleSend}
-              className="bg-black text-yellow-400 font-semibold hover:opacity-90 cursor-pointer"
+              className={cn(
+                "bg-black text-yellow-400 font-semibold hover:opacity-90 cursor-pointer",
+                disabled && "opacity-60 cursor-not-allowed"
+              )}
             >
               Send
             </Button>
           </div>
+
+          {/* Tooltip / Warning text */}
+          {disabled && (
+            <p className="mt-2 text-[11px] leading-tight text-yellow-400/80 font-semibold italic">
+              ⚠️ Please{" "}
+              {!publicKey && (
+                <>
+                  <span className="underline">connect your wallet</span>
+                  {userName === "guest" && " and "}
+                </>
+              )}
+              {userName === "guest" && (
+                <span className="underline">set your username</span>
+              )}{" "}
+              to chat globally.
+            </p>
+          )}
+
           <p className="mt-2 text-[11px] leading-none text-yellow-400 font-semibold brightness-75">
             Press Enter to send.
           </p>

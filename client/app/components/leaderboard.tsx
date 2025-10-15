@@ -16,10 +16,13 @@ import { Badge } from "@/components/ui/badge";
 import { ChartBarIncreasingIcon } from "lucide-react";
 
 type Trade = {
-  id: string | number;
+  key: String;
+  id: number;
   buy: number;
   sell?: number | null;
   pnl?: number | null;
+  tradeId: String;
+  userId: String;
 };
 
 type UserTrades = {

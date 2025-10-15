@@ -322,18 +322,20 @@ wss.on("connection", (ws) => {
         if (!openTrade) return;
         if (!openGlobalTrade) return;
 
-        openTrade.sell = data.sell;
-        openTrade.pnl = ((data.sell - openTrade.buy) / openTrade.buy) * 100;
+        openTrade.sell = currentMultiplier;
+        openTrade.pnl =
+          ((currentMultiplier - openTrade.buy) / openTrade.buy) * 100;
 
         // Updating the state of global
-        openTrade.sell = data.sell;
+        openTrade.sell = currentMultiplier;
         openGlobalTrade.pnl =
-          ((data.sell - openGlobalTrade.buy) / openGlobalTrade.buy) * 100;
+          ((currentMultiplier - openGlobalTrade.buy) / openGlobalTrade.buy) *
+          100;
 
         supabase
           .rpc("sell_trade", {
             p_wallet_address: data.userId,
-            p_sell_multiplier: data.sell,
+            p_sell_multiplier: currentMultiplier,
             p_game_id: gameId,
           })
           .then(({ data: rpcData, error }) => {
@@ -350,15 +352,16 @@ wss.on("connection", (ws) => {
             console.log("✅ Trade sold successfully for user:", data.userId);
 
             // Update local state
-            openTrade.sell = data.sell;
-            openTrade.pnl = ((data.sell - openTrade.buy) / openTrade.buy) * 100;
+            openTrade.sell = currentMultiplier;
+            openTrade.pnl =
+              ((currentMultiplier - openTrade.buy) / openTrade.buy) * 100;
 
             // Update global trades array
             const openGlobalTrade = userTrades.find(
               (t) => t.userId === data.userId && t.sell === undefined
             );
             if (openGlobalTrade) {
-              openGlobalTrade.sell = data.sell;
+              openGlobalTrade.sell = currentMultiplier;
               openGlobalTrade.pnl = openTrade.pnl;
             }
             console.log("✅ Sold trade result:", rpcData);

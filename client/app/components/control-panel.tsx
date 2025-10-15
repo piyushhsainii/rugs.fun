@@ -10,9 +10,6 @@ import {
 } from "@/components/ui/input-group";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
-import { useUserInformation } from "../hooks/userInfo";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 type Numberish = number | string;
@@ -31,8 +28,12 @@ type BetStopLossProps = {
   stopPercent?: number;
   onStopPercentChange?: (value: number) => void;
   percentPresets?: number[];
+  isApplied: boolean;
+  setisApplied: React.Dispatch<React.SetStateAction<boolean>>;
   // Visual
   className?: string;
+  setAutoSellAmount: React.Dispatch<React.SetStateAction<number | null>>;
+  autosell: number | null;
 };
 
 export function BetStopLossControl({
@@ -42,31 +43,21 @@ export function BetStopLossControl({
   min = 0,
   step = 0.001,
   amountPresets = ["+0.001", "+0.01", "+0.1", "+1", "1/2", "x2", "MAX"],
-  stopPercent,
-  onStopPercentChange,
-  percentPresets = [10, 25, 50, 100],
+  percentPresets = [1.5, 2, 3.5, 5],
+  balance,
+  setAutoSellAmount,
+  autosell,
+  isApplied,
+  setisApplied,
   className,
 }: BetStopLossProps) {
-  const { balance } = useUserInformation();
-
   // Controlled/uncontrolled pattern for amount
 
   const amt = amount;
   const setAmt = onAmountChange ?? setAmount;
+  const [message, setMessage] = React.useState("");
 
-  // Controlled/uncontrolled pattern for stop % (0-100)
-  const [internalStop, setInternalStop] = React.useState<number>(
-    stopPercent ?? 100
-  );
-  const stop = stopPercent ?? internalStop;
-  const setStop = onStopPercentChange ?? setInternalStop;
-
-  const formatAmt = (v: number) => {
-    // Keep small increments readable
-    return Number.isInteger(v)
-      ? v.toString()
-      : v.toFixed(3).replace(/\.?0+$/, "");
-  };
+  const setStop = setAutoSellAmount;
 
   const parseNumber = (val: string) => {
     const n = Number(val);
@@ -188,9 +179,7 @@ export function BetStopLossControl({
             <InputGroupText className="ml-1 flex items-center gap-1 bg-white/10 border border-yellow-500/30 rounded-md px-2 py-1">
               <span className="text-gray-300">Bal</span>
               <span className="font-mono text-yellow-300">
-                {formatAmt(
-                  balance ? Number((balance / LAMPORTS_PER_SOL).toFixed(4)) : 0
-                )}
+                {balance ? Number((balance / LAMPORTS_PER_SOL).toFixed(4)) : 0}
               </span>
             </InputGroupText>
           </InputGroupAddon>
@@ -208,7 +197,7 @@ export function BetStopLossControl({
           <div className="flex items-center gap-2 md:gap-3">
             <ButtonGroup className="shrink-0">
               {percentPresets.map((p) => {
-                const active = stop === p;
+                const active = autosell === p;
                 return (
                   <Button
                     key={p}
@@ -223,36 +212,66 @@ export function BetStopLossControl({
                     onClick={() => applyPercentPreset(p)}
                     aria-pressed={active}
                   >
-                    {p}%
+                    {p}x
                   </Button>
                 );
               })}
             </ButtonGroup>
 
-            {/* Slider */}
-            <div className="flex-1 flex items-center gap-4">
-              <Slider
-                value={[stop]}
-                onValueChange={(v) => setStop(Math.round(v[0]))}
-                min={0}
-                max={100}
+            {/* Auto Sell */}
+            <div className="flex-1 min-w-[200px]">
+              <input
+                inputMode="decimal"
+                type="number"
+                step="0.5"
+                min="0"
+                value={autosell ?? ""}
+                onChange={(e) => setAutoSellAmount(Number(e.target.value))}
+                aria-label="Bet amount"
+                placeholder="0"
                 className={cn(
-                  "w-full cursor-pointer",
-                  "[&_[data-slot='slider-track']]:bg-white/10",
-                  "[&_[data-slot='slider-range']]:bg-yellow-400",
-                  "[&_[data-slot='slider-thumb']]:bg-yellow-300",
-                  "[&_[data-slot='slider-thumb']]:hover:scale-110"
+                  "w-full font-mono text-lg md:text-2xl text-yellow-300 px-3 py-2 text-right rounded-md outline-none",
+                  "bg-white/10 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/50",
+                  "placeholder:text-white/40"
                 )}
               />
-              <div className="w-16 text-right font-mono text-yellow-300">
-                {stop} <span className="text-white/60">%</span>
-              </div>
             </div>
           </div>
 
-          <div className="mt-2 text-xs text-gray-400">
-            Auto-sell triggers when price drops by selected percentage.
+          <div className="w-full flex justify-between items-center">
+            <div className="mt-2 text-xs text-gray-400">
+              Auto-sell triggers when price matches by selected multiplier.
+            </div>
+            <div>
+              <button
+                onClick={() => {
+                  if (autosell && autosell > 0 && !isApplied) {
+                    setMessage("Auto-sell activated ✅");
+                    setisApplied(true);
+                    // setTimeout(() => setMessage(""), 2500);
+                  } else if (isApplied) {
+                    setisApplied(false);
+                    setAutoSellAmount(null);
+                    setMessage("");
+                  } else {
+                    setMessage("Please enter a valid amount ⚠️");
+                    setisApplied(false);
+                    // setTimeout(() => setMessage(""), 2500);
+                  }
+                }}
+                className="bg-yellow-400 text-sm rounded-lg px-3 py-1 my-1 text-black font-bold cursor-pointer hover:bg-yellow-300 transition"
+              >
+                {!isApplied ? "Apply" : "Turn Off"}
+              </button>
+            </div>
           </div>
+
+          {/* UX Message */}
+          {message && (
+            <div className="mt-2 text-sm font-medium text-yellow-400 animate-fade-in">
+              {message}
+            </div>
+          )}
         </div>
       </div>
     </div>

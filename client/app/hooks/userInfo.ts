@@ -8,6 +8,7 @@ export const useUserInformation = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [isApplied, setisApplied] = useState(false);
 
   // function to fetch balance
   const fetchBalance = useCallback(async () => {
@@ -50,6 +51,8 @@ export const useUserInformation = () => {
     setUserName,
     loading,
     error,
+    isApplied,
+    setisApplied,
     refetch: fetchBalance, // can call this from anywhere
   };
 };
