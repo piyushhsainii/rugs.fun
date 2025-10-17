@@ -195,7 +195,14 @@ const Navbar = () => {
     }
   };
 
-  // ——————————————————————————————————————————
+  const handleUsernameUpdate = async () => {
+    if (!changeusername?.trim() || !wallet?.publicKey) return;
+    const res = await updateUsername(
+      wallet.publicKey.toString(),
+      changeusername?.trim()
+    );
+    if (res) setUserName(res);
+  };
   return (
     <div
       className={`
@@ -378,50 +385,27 @@ const Navbar = () => {
 
             {/* — USERNAME AREA — */}
             <div className="w-full max-w-sm">
-              {userName && userName === "guest" ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    placeholder="Set Username"
-                    onChange={(e) => setchangeusername(e.target.value)}
-                    className="w-full px-4 py-1 text-white placeholder-yellow-300 bg-yellow-400/20 backdrop-blur-sm border border-yellow-400/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 transition duration-200 placeholder-opacity-70"
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  placeholder={
+                    userName === "guest"
+                      ? "Set Username"
+                      : userName || "Set Username"
+                  }
+                  value={changeusername ?? ""}
+                  onChange={(e) => setchangeusername(e.target.value)}
+                  className="w-full px-4 py-1 text-white placeholder-yellow-300 bg-yellow-400/20 backdrop-blur-sm border border-yellow-400/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400 transition duration-200 placeholder-opacity-70"
+                />
+
+                {(userName === "guest" || !userName) && (
+                  <Check
+                    size={20}
+                    onClick={handleUsernameUpdate}
+                    className="m-1 hover:scale-125 transition-all duration-150 bg-green-400 cursor-pointer active:scale-75 rounded"
                   />
-                  {userName !== changeusername &&
-                    changeusername &&
-                    changeusername !== "" && (
-                      <Check
-                        size={20}
-                        className="m-1 hover:scale-125 transition-all duration-150 bg-green-400 cursor-pointer active:scale-75"
-                        onClick={async () => {
-                          const res = await updateUsername(
-                            wallet.publicKey!.toString(),
-                            changeusername
-                          );
-                          if (res) setUserName(res);
-                        }}
-                      />
-                    )}
-                </div>
-              ) : (
-                <div
-                  className="font-extrabold text-2xl cursor-pointer text-yellow-400"
-                  style={{
-                    textShadow: `
-                  3px 3px 0 #000,
-                  -3px -3px 0 #000,
-                  3px -3px 0 #000,
-                  -3px 3px 0 #000,
-                  2px 2px 0 #FFD700,
-                  -2px -2px 0 #FFD700,
-                  2px -2px 0 #FFD700,
-                  -2px 2px 0 #FFD700,
-                  0 0 5px rgba(255,255,255,0.7)
-                `,
-                  }}
-                >
-                  {userName ?? "loading..."}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         ) : (
