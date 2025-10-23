@@ -214,6 +214,7 @@ export default function useGameWebSocket() {
     userId,
     latency,
     globalChats,
+    setUserId,
     setGlobalChats,
     setGameState,
   };

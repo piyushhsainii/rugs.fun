@@ -23,7 +23,7 @@ type BetStopLossProps = {
   onStopPercentChange?: (value: number) => void;
   percentPresets?: number[];
   isApplied: boolean;
-  setisApplied: React.Dispatch<React.SetStateAction<boolean>>;
+  setisApplied: (isApplied: boolean) => void;
   // Visual
   className?: string;
   setAutoSellAmount: React.Dispatch<React.SetStateAction<number | null>>;

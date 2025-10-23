@@ -39,6 +39,7 @@ export default function Home() {
     historyRef,
     targetMultiplierRef,
     userId,
+    setUserId,
     clientsConnected,
     wsRef,
     latency,
@@ -76,9 +77,7 @@ export default function Home() {
         buyAmount: internalAmount * LAMPORTS_PER_SOL,
       })
     );
-    setBalance((prevBal) =>
-      prevBal ? prevBal - internalAmount : internalAmount
-    );
+    setBalance(balance ? balance - internalAmount : internalAmount);
     refetch();
   };
   const handleSell = () => {
@@ -521,11 +520,12 @@ export default function Home() {
 
     if (wallet && wallet.publicKey) {
       localStorage.setItem("userId", wallet.publicKey.toBase58());
+      setUserId(wallet.publicKey.toString());
     } else {
       localStorage.setItem("userId", "guest");
+      setUserId("guest");
     }
   }, [wallet]); // runs when wallet changes
-  useEffect(() => {}, [balance]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -602,7 +602,7 @@ export default function Home() {
               <div className=" bg-yellow-400 px-3 py-1 flex rounded-lg items-center gap-2 text-black font-bold font-mono">
                 Balance:
                 <span className="text-black font-bold font-mono">
-                  {balance && (balance / 1000000000).toFixed(4)}
+                  {balance ? balance / 1000000000 : 0}
                 </span>
                 <span>
                   {" "}
@@ -677,7 +677,9 @@ export default function Home() {
                 gameStateRef.current == "CRASHED" ||
                 gameStateRef.current == "WAITING"
                   ? true
-                  : false || internalAmount == 0
+                  : false ||
+                    internalAmount == 0 ||
+                    !allUserTrades.find((d) => d.userId == userId)
               }
               className={`bg-red-600 hover:bg-red-700 h-10 w-full  text-xl shadow-black text-white px-6 py-3 rounded-lg font-bold cursor-pointer shadow-lg`}
               style={{

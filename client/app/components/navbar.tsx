@@ -316,21 +316,32 @@ const Navbar = () => {
                       type="number"
                       placeholder="Withdraw Amount"
                       value={tokenamount}
-                      onChange={(e) => setTokenAmount(e.target.value)}
+                      onChange={(e) => {
+                        if (
+                          Number(e.target.value) >
+                          Number(balance! / LAMPORTS_PER_SOL)
+                        ) {
+                          setTokenAmount(
+                            JSON.stringify(Number(balance! / LAMPORTS_PER_SOL))
+                          );
+                        } else {
+                          setTokenAmount(e.target.value);
+                        }
+                      }}
                       className="outline-none p-3 border border-yellow-400/50 w-full rounded-xl placeholder:text-gray-300 text-yellow-400 bg-yellow-600/10 placeholder:font-mono placeholder:text-xs"
                     />
                     <div className="w-full flex justify-between text-xs items-center my-1">
                       <div className="brightness-75 text-yellow-400 px-2">
                         Available to withdraw:{" "}
                         {balance
-                          ? Number(balance / LAMPORTS_PER_SOL).toFixed(4)
+                          ? Number(balance / LAMPORTS_PER_SOL)
                           : "0.0000"}
                       </div>
                       <div
                         className="border border-yellow-400/50 rounded-full px-3 py-1 text-xs cursor-pointer hover:bg-yellow-400/80 hover:text-white"
                         onClick={() =>
                           setTokenAmount(
-                            Number(balance! / LAMPORTS_PER_SOL).toFixed(4)
+                            JSON.stringify(Number(balance! / LAMPORTS_PER_SOL))
                           )
                         }
                       >
