@@ -16,7 +16,7 @@ The game integrates **Web3 wallets**, **real-time WebSocket events**, and **on-c
 
 ## 🔗 Project Link
 
-[**rugs.fun**(https://rugs-funn.vercel.app/)] 
+[**rugs.fun**](https://rugs-funn.vercel.app/)
 ---
 
 ## ✨ Core Features
